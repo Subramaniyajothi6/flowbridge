@@ -74,6 +74,7 @@ Dates are in YYYY-MM-DD format.
 | 5.7 | ~~Redis and BullMQ for the queue.~~ Replaced by 5.8. | Agreed at first, then replaced on 2026-11-09. |
 | 5.8 | pg-boss for background jobs, stored in PostgreSQL (2026-11-09). | It removes Redis entirely. Redis would have to be hosted online because of the 4 GB laptop, and idle BullMQ workers keep using up request-based free plans. pg-boss provides retries, delays and dead letter queues. |
 | 5.9 | Free Neon PostgreSQL, with no local database (2026-11-09). | Nothing database-related runs on the laptop, and the free plan needs no credit card. |
+| 5.9a | The Neon project is in Singapore (`aws-ap-southeast-1`), fixed at the smallest compute size, 0.25 units, using the direct connection (2026-11-09). | Singapore is close to the developer. The fixed size gives about 400 hours a month within the free 100 compute hours. The direct connection is the safe choice for a job queue that holds database connections open. |
 | 5.10 | During development, the API and worker run as one Node process (2026-11-09). | Saves memory on the laptop. |
 | 5.11 | ~~Host on Railway or Render.~~ Replaced by 5.12. | Railway only has a trial and a very small monthly credit, so it conflicts with 1.3. |
 | 5.12 | Deploy on one free Render web service, with the API and worker in the same process (2026-11-09). | Render's free plan has no background worker type, needs no credit card and gives 750 hours a month. |

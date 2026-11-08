@@ -1,5 +1,6 @@
-import { integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import type { WorkflowDefinition } from "../engine/definition.ts";
+import type { PollConfig, PollCursor, ScheduleConfig } from "../triggers/definition.ts";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
@@ -8,6 +9,8 @@ export const workflows = pgTable("workflows", {
   name: text("name").notNull(),
   // Secret part of the webhook address for this workflow.
   webhookToken: text("webhook_token").notNull().unique(),
+  // When set, webhook deliveries must be signed with this secret.
+  webhookSecret: text("webhook_secret"),
   // The version that new runs use.
   currentVersionId: uuid("current_version_id"),
   createdAt: createdAt(),
@@ -27,7 +30,28 @@ export const workflowVersions = pgTable(
   (table) => [unique().on(table.workflowId, table.versionNumber)],
 );
 
+// Schedules and polls are stored here so that they survive restarts and the
+// host going to sleep. When the app wakes up, anything overdue is still in the table.
+export const triggers = pgTable(
+  "triggers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workflowId: uuid("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+    type: text("type").$type<"schedule" | "poll">().notNull(),
+    config: jsonb("config").$type<ScheduleConfig | PollConfig>().notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    nextFireAt: timestamp("next_fire_at", { withTimezone: true }).notNull(),
+    lastFiredAt: timestamp("last_fired_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    // What a poll has already seen. Empty until its first check.
+    cursor: jsonb("cursor").$type<PollCursor>(),
+    createdAt: createdAt(),
+  },
+  (table) => [index().on(table.enabled, table.nextFireAt)],
+);
+
 export type RunStatus = "queued" | "running" | "succeeded" | "failed";
+export type RunTriggerType = "manual" | "webhook" | "schedule" | "poll";
 
 export const runs = pgTable(
   "runs",
@@ -36,7 +60,7 @@ export const runs = pgTable(
     workflowId: uuid("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
     versionId: uuid("version_id").notNull().references(() => workflowVersions.id),
     status: text("status").$type<RunStatus>().notNull().default("queued"),
-    triggerType: text("trigger_type").$type<"manual" | "webhook">().notNull(),
+    triggerType: text("trigger_type").$type<RunTriggerType>().notNull(),
     triggerData: jsonb("trigger_data").notNull(),
     // Stops the same webhook delivery from starting two runs.
     idempotencyKey: text("idempotency_key"),

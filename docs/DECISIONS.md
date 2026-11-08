@@ -88,7 +88,7 @@ Dates are in YYYY-MM-DD format.
 
 | # | Decision | Why |
 |---|----------|-----|
-| 6.1 | Each queue job does one piece of work on a run, then queues the next job (2026-11-09). | A long workflow never holds one long job, and a crash only loses the step in progress. |
+| 6.1 | ~~Each queue job does one piece of work on a run, then queues the next job.~~ Replaced by 6.10. | Measured at about 39 seconds for a 3-step run, because each step waited for the next queue check. |
 | 6.2 | The next action is worked out from the saved step rows every time, by a function that only reads its inputs (2026-11-09). | The same code handles a normal run and a recovered one, and it can be unit tested without a database. |
 | 6.3 | A worker takes a time-limited lease on a run before working on it. The lease is longer than the 30 second step limit (2026-11-09). | Two workers can never work on the same run at once, and a dead worker's lease simply runs out. |
 | 6.4 | A periodic sweep queues unfinished runs that no worker owns (2026-11-09). | It covers an app stopping between saving a run and queueing it, and restarts work after a free host wakes up. |
@@ -97,6 +97,9 @@ Dates are in YYYY-MM-DD format.
 | 6.7 | A step runs when every step before it has finished and at least one incoming edge was followed. Otherwise it is skipped (2026-11-09). | Branches from an If step can join again without the join waiting forever. |
 | 6.8 | HTTP steps refuse private network addresses and redirects, allow 30 seconds and accept up to 1 MB (2026-11-09). | Workflow authors choose the URL, so without limits a workflow could reach the server's internal network or exhaust a small free server's memory. |
 | 6.9 | Webhook addresses contain a long random token. An `Idempotency-Key` header stops repeated deliveries from starting a second run (2026-11-09). | Senders commonly retry deliveries, and the address must not be guessable. |
+| 6.10 | A worker carries a run from step to step inside one job, for up to half of the job's time limit, then queues the rest (2026-11-09). | Removes the wait between steps. A crash still only loses the step in progress, because progress is saved after every step. |
+| 6.11 | The database wakes workers through PostgreSQL notifications, with a slower check as a backstop (2026-11-09). | A new run starts straight away, and this also works if the API and worker are ever run separately. |
+| 6.12 | A worker handles 3 runs at once. A lease must always be longer than the longest step (2026-11-09). | One slow workflow should not hold up the others. If a lease ran out during a step, another worker would correctly take the run over and repeat that step. |
 
 ## 7. Repository
 
@@ -104,3 +107,22 @@ Dates are in YYYY-MM-DD format.
 |---|----------|-----|
 | 7.1 | Application code lives in its own repository, `flowbridge`, separate from the design samples repository (2026-11-09). | The design repository only holds comparison pages for the team. The assignment asks for source code with a clear structure. |
 | 7.2 | The repository starts private (2026-11-09). | The owner can make it public when it is ready to submit. Render's free plan can deploy from it either way. |
+
+## 8. Triggers
+
+| # | Decision | Why |
+|---|----------|-----|
+| 8.1 | Schedules and polls are rows in a `triggers` table, checked every 20 seconds (2026-11-09). | They survive restarts and the free host sleeping. Whatever is overdue is still in the table on wake-up. |
+| 8.2 | A trigger creates its run first and saves its next time second, with an idempotency key from the trigger and its scheduled time or item ID (2026-11-09). | If the app stops between the two, the same firing repeats and becomes the existing run. No locks are needed. |
+| 8.3 | If several scheduled times were missed, the schedule runs once and moves on (2026-11-09). | Waking up after a long sleep should not start a pile of identical runs. |
+| 8.4 | Schedules use five-part cron expressions with a timezone (2026-11-09). | Cron is the widely understood format, and business schedules follow local time. The shortest gap is one minute. |
+| 8.5 | The first check of a poll only records existing items and starts no runs (2026-11-09). | Otherwise turning on a poll would start a run for everything already in the list. |
+| 8.6 | Polls remember the IDs they have seen, at least the latest 1000, rather than a timestamp (2026-11-09). | Not every API offers a reliable "updated since" field, but list items nearly always have an ID. |
+| 8.7 | A poll starts at most 50 runs per check and checks at most once a minute (2026-11-09). | Protects the free database's compute hours. Items over the limit are picked up by the next check. |
+| 8.8 | A failing trigger keeps its normal timing and shows the error (2026-11-09). | A broken feed should be visible, and should not be retried non-stop. |
+| 8.9 | The saved run is the durable record of a webhook delivery, with no separate events table (2026-11-09). | The run is saved before replying, so a second table would hold the same data. |
+| 8.10 | Webhooks can require an HMAC-SHA256 signature, calculated on the exact bytes received (2026-11-09). | Anyone who learns a webhook address could otherwise send fake events. |
+| 8.11 | Webhooks accept JSON, form and plain text up to 256 KB, and at most 120 deliveries per workflow per minute. Headers holding secrets are not saved (2026-11-09). | Real services send different formats, a small free server needs limits, and run details are shown to users. |
+| 8.12 | Common delivery ID headers are recognised, including `Idempotency-Key`, `webhook-id` and `X-GitHub-Delivery` (2026-11-09). | Repeated deliveries are ignored without any setup for those senders. |
+| 8.13 | Webhook secrets and poll headers are stored as plain values for now (2026-11-09). | Encrypted storage is built in the connections stage, and they will move to it then. Until then, poll headers should not hold real keys. |
+| 8.14 | Use `cron-parser` and `@fastify/rate-limit` (2026-11-09). | Both are small, free and widely used, and correct cron and timezone handling is easy to get wrong by hand. |

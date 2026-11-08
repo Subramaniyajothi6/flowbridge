@@ -3,7 +3,8 @@ import { sql } from "drizzle-orm";
 import { ZodError } from "zod";
 import { db } from "../db/client.ts";
 import { registerRunRoutes } from "./runs.ts";
-import { registerWebhookRoutes } from "./webhooks.ts";
+import { registerTriggerRoutes } from "./triggers.ts";
+import { webhookRoutes } from "./webhooks.ts";
 import { registerWorkflowRoutes } from "./workflows.ts";
 
 export function buildServer() {
@@ -28,6 +29,7 @@ export function buildServer() {
 
   registerWorkflowRoutes(app);
   registerRunRoutes(app);
-  registerWebhookRoutes(app);
+  registerTriggerRoutes(app);
+  app.register(webhookRoutes);
   return app;
 }

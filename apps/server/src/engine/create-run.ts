@@ -1,12 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/client.ts";
-import { runs } from "../db/schema.ts";
+import { runs, type RunTriggerType } from "../db/schema.ts";
 import { enqueueAdvanceRun } from "./queue.ts";
 
 type CreateRunInput = {
   workflowId: string;
   versionId: string;
-  triggerType: "manual" | "webhook";
+  triggerType: RunTriggerType;
   triggerData: unknown;
   idempotencyKey?: string;
 };

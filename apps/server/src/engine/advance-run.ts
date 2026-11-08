@@ -106,11 +106,11 @@ async function executeStep(
     return;
   }
 
-  await saveStep(run.id, step.id, { status: "running", attempt, startedAt: new Date(), error: null });
+  const startedAt = new Date();
 
   try {
     const input = resolveStepInput(step, context);
-    await saveStep(run.id, step.id, { status: "running", input });
+    await saveStep(run.id, step.id, { status: "running", attempt, startedAt, input, error: null });
     const output = await runStep(step, input, {
       allowPrivateUrls: config.ALLOW_PRIVATE_URLS,
       // Stays the same across attempts, so a repeat is recognisable.
@@ -119,7 +119,7 @@ async function executeStep(
     await saveStep(run.id, step.id, { status: "succeeded", output: output ?? null, finishedAt: new Date() });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await saveStep(run.id, step.id, { status: "failed", error: message, finishedAt: new Date() });
+    await saveStep(run.id, step.id, { status: "failed", attempt, startedAt, error: message, finishedAt: new Date() });
   }
 }
 

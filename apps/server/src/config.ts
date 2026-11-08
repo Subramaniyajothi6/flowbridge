@@ -16,6 +16,10 @@ const envSchema = z.object({
   JOB_EXPIRE_SECONDS: z.coerce.number().default(120),
   // How often the worker looks for runs that nobody is working on.
   SWEEP_SECONDS: z.coerce.number().default(30),
+  // How often the worker checks for schedules and polls that are due.
+  TRIGGER_TICK_SECONDS: z.coerce.number().default(20),
+  // The most webhook deliveries one workflow accepts in a minute.
+  WEBHOOK_MAX_PER_MINUTE: z.coerce.number().default(120),
 });
 
 export const config = envSchema.parse(process.env);

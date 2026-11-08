@@ -12,7 +12,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 // Must be set before config.ts is loaded. The workers inherit these too.
 process.env.ALLOW_PRIVATE_URLS = "true";
-process.env.LEASE_SECONDS = "5";
+// Must stay longer than SLOW_STEP_MS, the same rule as the real settings.
+process.env.LEASE_SECONDS = "12";
 process.env.SWEEP_SECONDS = "3";
 process.env.RUN_MODE = "worker";
 

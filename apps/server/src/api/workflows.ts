@@ -23,11 +23,21 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
         .returning();
       return addVersion(tx, created.id, body.definition);
     });
-    return reply.status(201).send(workflow);
+    return reply.status(201).send(toPublicWorkflow(workflow));
   });
 
   app.get("/api/workflows", async () => {
-    return db.select().from(workflows).orderBy(desc(workflows.createdAt));
+    const rows = await db.select().from(workflows).orderBy(desc(workflows.createdAt));
+    return rows.map(toPublicWorkflow);
+  });
+
+  // Creates or replaces the signing secret. This is the only time it is shown.
+  app.post("/api/workflows/:id/webhook-secret", async (request, reply) => {
+    const { id } = idParams.parse(request.params);
+    const webhookSecret = randomBytes(32).toString("hex");
+    const [updated] = await db.update(workflows).set({ webhookSecret }).where(eq(workflows.id, id)).returning();
+    if (!updated) return reply.status(404).send({ error: "Workflow not found" });
+    return reply.status(201).send({ webhookSecret });
   });
 
   app.get("/api/workflows/:id", async (request, reply) => {
@@ -40,7 +50,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
       .from(workflowVersions)
       .where(eq(workflowVersions.workflowId, id))
       .orderBy(desc(workflowVersions.versionNumber));
-    return { ...workflow, versions };
+    return { ...toPublicWorkflow(workflow), versions };
   });
 
   // Saving never edits an old version. It always adds a new one.
@@ -51,7 +61,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
     if (!workflow) return reply.status(404).send({ error: "Workflow not found" });
 
     const updated = await db.transaction((tx) => addVersion(tx, id, body.definition));
-    return reply.status(201).send(updated);
+    return reply.status(201).send(toPublicWorkflow(updated));
   });
 
   app.post("/api/workflows/:id/runs", async (request, reply) => {
@@ -70,7 +80,12 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
   });
 }
 
-type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+// The signing secret must never appear in an API response.
+function toPublicWorkflow({ webhookSecret, ...workflow }: typeof workflows.$inferSelect) {
+  return { ...workflow, requiresSignature: webhookSecret !== null };
+}
+
+type Transaction =Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function addVersion(tx: Transaction, workflowId: string, definition: WorkflowDefinition) {
   // Locks the workflow row, so two saves at once cannot get the same number.

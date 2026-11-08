@@ -83,9 +83,23 @@ Dates are in YYYY-MM-DD format.
 | 5.16 | Tests use Node's built-in test runner (2026-11-09). | No extra test framework to install on a low-memory laptop. |
 | 5.17 | Run TypeScript with `tsx` instead of a compile step (2026-11-09). | One less build step to run and to explain. |
 
-## 6. Repository
+## 6. Run engine
 
 | # | Decision | Why |
 |---|----------|-----|
-| 6.1 | Application code lives in its own repository, `flowbridge`, separate from the design samples repository (2026-11-09). | The design repository only holds comparison pages for the team. The assignment asks for source code with a clear structure. |
-| 6.2 | The repository starts private (2026-11-09). | The owner can make it public when it is ready to submit. Render's free plan can deploy from it either way. |
+| 6.1 | Each queue job does one piece of work on a run, then queues the next job (2026-11-09). | A long workflow never holds one long job, and a crash only loses the step in progress. |
+| 6.2 | The next action is worked out from the saved step rows every time, by a function that only reads its inputs (2026-11-09). | The same code handles a normal run and a recovered one, and it can be unit tested without a database. |
+| 6.3 | A worker takes a time-limited lease on a run before working on it. The lease is longer than the 30 second step limit (2026-11-09). | Two workers can never work on the same run at once, and a dead worker's lease simply runs out. |
+| 6.4 | A periodic sweep queues unfinished runs that no worker owns (2026-11-09). | It covers an app stopping between saving a run and queueing it, and restarts work after a free host wakes up. |
+| 6.5 | A step that was interrupted runs again, up to 3 attempts, and sends the same idempotency key `runId:stepId` (2026-11-09). | The worker cannot know whether an interrupted call reached the other service. The key lets that service ignore the repeat. |
+| 6.6 | A failed step stops the run for now (2026-11-09). | Error paths and step retries belong to the recovery stage of the build order. |
+| 6.7 | A step runs when every step before it has finished and at least one incoming edge was followed. Otherwise it is skipped (2026-11-09). | Branches from an If step can join again without the join waiting forever. |
+| 6.8 | HTTP steps refuse private network addresses and redirects, allow 30 seconds and accept up to 1 MB (2026-11-09). | Workflow authors choose the URL, so without limits a workflow could reach the server's internal network or exhaust a small free server's memory. |
+| 6.9 | Webhook addresses contain a long random token. An `Idempotency-Key` header stops repeated deliveries from starting a second run (2026-11-09). | Senders commonly retry deliveries, and the address must not be guessable. |
+
+## 7. Repository
+
+| # | Decision | Why |
+|---|----------|-----|
+| 7.1 | Application code lives in its own repository, `flowbridge`, separate from the design samples repository (2026-11-09). | The design repository only holds comparison pages for the team. The assignment asks for source code with a clear structure. |
+| 7.2 | The repository starts private (2026-11-09). | The owner can make it public when it is ready to submit. Render's free plan can deploy from it either way. |

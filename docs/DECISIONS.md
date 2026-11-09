@@ -148,4 +148,22 @@ Dates are in YYYY-MM-DD format.
 | 9.15 | Values in fields named like secrets are replaced with `[hidden]` before step data is saved (2026-11-09). | Run details are shown to users. A later step cannot read a field hidden this way, which is an accepted limit. |
 | 9.16 | Server logs leave out query strings and webhook tokens (2026-11-09). | Addresses can carry sign-in codes and secret tokens. |
 | 9.17 | Credentials are tested when they are added, and are not kept if they fail (2026-11-09). | Mistakes appear immediately rather than during a run. |
-| 9.18 | A simple `/connect` page is used to add connections for now (2026-11-09). | Secrets need somewhere to be entered before the real interface exists, as planned in 2.3. It must not be public until sign-in is built. |
+| 9.18 | ~~A simple `/connect` page is used to add connections for now.~~ Replaced by 10.8. | It was only needed until the real interface existed. |
+
+## 10. Visual builder and screens
+
+| # | Decision | Why |
+|---|----------|-----|
+| 10.1 | The server serves the built React app, so one process runs everything (2026-11-09). | Vite's development server is not needed day to day on a 4 GB laptop, and a free host runs only one service. |
+| 10.2 | The approved prototype's stylesheet is reused as it is (2026-11-09). | The team already approved that design, so rewriting it could only introduce differences. |
+| 10.3 | Plain React state and a small loading hook, with no state or data library (2026-11-09). | There is less to install and less to explain. |
+| 10.4 | The canvas shows a trigger node. Steps coming out of it are the starting steps, and every step must be connected before saving (2026-11-09). | The engine starts any step with nothing before it, so an unconnected step would run unexpectedly. |
+| 10.5 | Each save creates a new version (2026-11-09). | Follows 2.4. Separate draft and publish arrives with roles in stage 6. |
+| 10.6 | The data picker offers real values from the latest run or step test (2026-11-09). | Choosing a real value is easier and safer than typing a path. Only steps that run earlier are offered. |
+| 10.7 | Testing a step makes the real call (2026-11-09). | It proves the step works and captures real sample data. A tooltip says so, because a Slack step really posts. |
+| 10.8 | Connections are managed on the Integrations screen (2026-11-09). | It replaces the temporary page. It must stay off the public internet until sign-in exists. |
+| 10.9 | The execution screen draws the version the run used (2026-11-09). | Later edits must not change the record of what happened. |
+| 10.10 | Running is shown live on the canvas without marking the workflow as edited (2026-11-09). | Watching a run is not a change. |
+| 10.11 | Workflows may start empty (2026-11-09). | Replaces the rule that a workflow needs at least one step, so one can be built on the canvas. A run still needs a step. |
+| 10.12 | Table header corners are rounded on the cells themselves (2026-11-09). | Completes 4.13 without clipping row menus. |
+| 10.13 | The builder shows a message on phones instead of a squeezed canvas (2026-11-09). | A node canvas cannot be used at phone width. |

@@ -2,8 +2,8 @@ import Fastify from "fastify";
 import { sql } from "drizzle-orm";
 import { ZodError } from "zod";
 import { db } from "../db/client.ts";
-import { registerConnectPage } from "./connect-page.ts";
 import { registerConnectionRoutes } from "./connections.ts";
+import { registerWebApp } from "./web-app.ts";
 import { registerRunRoutes } from "./runs.ts";
 import { registerTriggerRoutes } from "./triggers.ts";
 import { webhookRoutes } from "./webhooks.ts";
@@ -44,7 +44,7 @@ export function buildServer() {
   registerRunRoutes(app);
   registerTriggerRoutes(app);
   registerConnectionRoutes(app);
-  registerConnectPage(app);
+  registerWebApp(app);
   app.register(webhookRoutes);
   return app;
 }

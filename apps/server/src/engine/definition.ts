@@ -27,10 +27,17 @@ const connectorConfig = z.object({
   params: z.record(z.string(), z.unknown()).default({}),
 });
 
-const stepSchema = z.discriminatedUnion("type", [
-  z.object({ id: stepId, name: z.string().min(1), type: z.literal("http_request"), config: httpRequestConfig }),
-  z.object({ id: stepId, name: z.string().min(1), type: z.literal("if"), config: ifConfig }),
-  z.object({ id: stepId, name: z.string().min(1), type: z.literal("connector"), config: connectorConfig }),
+// Fields every step has. The position is only where the step sits on the canvas.
+const stepBase = {
+  id: stepId,
+  name: z.string().min(1),
+  position: z.object({ x: z.number(), y: z.number() }).optional(),
+};
+
+export const stepSchema = z.discriminatedUnion("type", [
+  z.object({ ...stepBase, type: z.literal("http_request"), config: httpRequestConfig }),
+  z.object({ ...stepBase, type: z.literal("if"), config: ifConfig }),
+  z.object({ ...stepBase, type: z.literal("connector"), config: connectorConfig }),
 ]);
 
 // An edge says: after step "from", go to step "to".
@@ -43,7 +50,8 @@ const edgeSchema = z.object({
 
 export const workflowDefinitionSchema = z
   .object({
-    steps: z.array(stepSchema).min(1).max(100),
+    // A new workflow starts empty, so that it can be built on the canvas.
+    steps: z.array(stepSchema).max(100),
     edges: z.array(edgeSchema).default([]),
   })
   .superRefine((definition, context) => {

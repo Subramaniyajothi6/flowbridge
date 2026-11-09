@@ -149,7 +149,7 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
   // The provider sends the person back here after they approve.
   app.get("/api/connections/oauth/callback", async (request, reply) => {
     const query = callbackQuery.parse(request.query);
-    const fail = (message: string) => reply.redirect(`/connect?error=${encodeURIComponent(message)}`);
+    const fail = (message: string) => reply.redirect(`/integrations?error=${encodeURIComponent(message)}`);
 
     if (!query.state) return fail("The sign-in reply was incomplete");
 
@@ -176,7 +176,7 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
         expiresAt: tokens.expiresAt,
       });
       await verifyConnection(id);
-      return reply.redirect("/connect?connected=1");
+      return reply.redirect("/integrations?connected=1");
     } catch (error) {
       if (id) await db.delete(connections).where(eq(connections.id, id));
       request.log.error(error);

@@ -1,0 +1,81 @@
+/* Additions to the design system for the real app. */
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Running is blue, so that orange only ever means an action or a selection. */
+.badge.b-run { background: #eaf0fe; color: #2563eb; }
+.node.running { border-color: #2563eb; box-shadow: 0 0 0 3px #eaf0fe, var(--sh-2); }
+.node-x.run, .tl-n.run { background: #2563eb; }
+
+/* Table corners follow the rounded card, without clipping anything inside the table. */
+.tbl-round { border-radius: var(--r-l); }
+.tbl-round .tbl tr:first-child th:first-child { border-top-left-radius: var(--r-l); }
+.tbl-round .tbl tr:first-child th:last-child { border-top-right-radius: var(--r-l); }
+.tbl-round .tbl tbody tr:last-child td:first-child { border-bottom-left-radius: var(--r-l); }
+.tbl-round .tbl tbody tr:last-child td:last-child { border-bottom-right-radius: var(--r-l); }
+
+/* Canvas: the library positions nodes itself, so ours sit in normal flow. */
+.fb-canvas { flex: 1; min-height: 0; position: relative; background-color: #f8f6f6; }
+.fb-canvas .node { position: relative; animation: none; }
+.fb-canvas .react-flow__node { cursor: grab; }
+.fb-canvas .react-flow__edge-path { stroke: #9d9d9f; stroke-width: 1.75; }
+.fb-canvas .react-flow__edge.selected .react-flow__edge-path,
+.fb-canvas .react-flow__edge:hover .react-flow__edge-path { stroke: var(--brand); stroke-width: 2.25; }
+.fb-canvas .react-flow__connection-path { stroke: var(--brand); stroke-width: 2; stroke-dasharray: 5 4; }
+.fb-canvas .react-flow__edge-text { font: 600 11px var(--sans); fill: var(--ink-2); }
+.fb-canvas .react-flow__handle {
+  width: 12px; height: 12px; background: var(--surface); border: 2px solid #8d8d8f;
+}
+.fb-canvas .react-flow__handle:hover, .fb-canvas .react-flow__handle.connectingto {
+  border-color: var(--brand); background: var(--brand-t);
+}
+.fb-canvas .react-flow__controls { box-shadow: var(--sh-1); border-radius: var(--r); overflow: hidden; }
+.fb-canvas .react-flow__attribution { display: none; }
+.handle-label {
+  position: absolute; left: calc(100% + 11px); transform: translateY(-50%);
+  font-size: 11px; font-weight: 600; color: var(--ink-2); background: #f8f6f6; padding: 0 3px; pointer-events: none;
+}
+
+/* Tile view: compact nodes with the name below. */
+.b-tile .node { width: 88px; height: 88px; border-radius: 14px; }
+.b-tile .node.is-trig { border-radius: 40px 14px 14px 40px; }
+.b-tile .node-b { inset: 0; justify-content: center; padding: 0; border-radius: inherit; }
+.b-tile .node-b > .grow { position: absolute; top: calc(100% + 8px); left: 50%; width: 170px; transform: translateX(-50%); text-align: center; pointer-events: none; }
+.b-tile .node-t { white-space: normal; line-height: 1.25; }
+.b-tile .node-d { font-size: 11.5px; margin-top: 1px; }
+.b-tile .node-b > .step-icon { transform: scale(1.5); }
+.b-tile .node-f { display: none; }
+
+.step-icon { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; flex: none; }
+.step-icon img { width: 18px; height: 18px; display: block; object-fit: contain; }
+.step-icon.lg { width: 36px; height: 36px; border-radius: 8px; }
+.step-icon.lg img { width: 22px; height: 22px; }
+
+/* Replay panel on the execution screen: a fine grid on a dark surface. */
+.run-canvas {
+  height: 320px; padding: 0; overflow: hidden; display: flex; border-radius: 14px; background-color: #181819;
+  background-image: linear-gradient(rgba(255, 255, 255, .06) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .06) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.run-canvas .fb-canvas { background: none; }
+.run-canvas .react-flow__edge-path { stroke: rgba(255, 255, 255, .34); }
+.run-canvas .react-flow__edge-text { fill: #e4e4e5; }
+.run-canvas .react-flow__edge-textbg { fill: #181819; }
+.run-canvas .react-flow__handle { opacity: 0; }
+
+.g-run { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.code.tall { max-height: 420px; }
+.pre-wrap { white-space: pre-wrap; word-break: break-word; }
+.conn-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0 0; margin-top: 10px; border-top: 1px solid var(--line); }
+.conn-row > .grow { flex: 1 1 160px; }
+.hint-bar.is-live { pointer-events: auto; display: flex; align-items: center; gap: 8px; }
+.side-rows { display: flex; flex-direction: column; gap: 8px; }
+.side-row { border: 1px solid var(--line); border-radius: var(--r); padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; }
+.kv { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 28px; gap: 6px; align-items: center; }
+.b-small-screen { display: none; }
+
+@media (max-width: 860px) {
+  .g-run { grid-template-columns: minmax(0, 1fr); }
+  .b-body, .b-top .b-desk { display: none; }
+  .b-small-screen { display: flex; flex: 1; align-items: center; justify-content: center; text-align: center; padding: 32px 20px; }
+}

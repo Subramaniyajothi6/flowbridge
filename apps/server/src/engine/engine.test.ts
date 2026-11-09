@@ -73,8 +73,16 @@ describe("definition rules", () => {
     },
     "true edge from a normal step": { steps: [http("a"), http("b")], edges: [{ from: "a", to: "b", when: "true" }] },
     "success edge from an If step": { steps: [ifStep("a"), http("b")], edges: [{ from: "a", to: "b" }] },
-    "no steps": { steps: [], edges: [] },
   };
+
+  it("accepts an empty workflow, so one can be built up on the canvas", () => {
+    assert.equal(workflowDefinitionSchema.safeParse({ steps: [], edges: [] }).success, true);
+  });
+
+  it("keeps a step's canvas position", () => {
+    const parsed = workflowDefinitionSchema.parse({ steps: [{ ...http("a"), position: { x: 10, y: 20 } }] });
+    assert.deepEqual(parsed.steps[0].position, { x: 10, y: 20 });
+  });
 
   for (const [name, definition] of Object.entries(invalid)) {
     it(`rejects ${name}`, () => {

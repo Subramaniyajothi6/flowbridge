@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 .env.local
+client_secret*.json
 *.log
 .DS_Store
 .tmp/

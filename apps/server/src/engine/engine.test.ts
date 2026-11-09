@@ -161,6 +161,84 @@ describe("choosing the next action", () => {
   });
 });
 
+describe("pauses and error paths", () => {
+  const delay = (id: string) => ({ id, name: id, type: "delay" as const, config: { amount: 5, unit: "minutes" as const } });
+  const approval = (id: string) => ({ id, name: id, type: "approval" as const, config: { message: "OK?", timeoutHours: 24 } });
+  const failed: StepState = { status: "failed", output: null };
+  const waiting: StepState = { status: "waiting", output: null };
+
+  const withDelay = { steps: [delay("wait"), http("after")], edges: [{ from: "wait", to: "after", when: "success" as const }] };
+  const withErrorPath = {
+    steps: [http("risky"), http("next"), http("cleanup")],
+    edges: [
+      { from: "risky", to: "next", when: "success" as const },
+      { from: "risky", to: "cleanup", when: "error" as const },
+    ],
+  };
+  const withApproval = {
+    steps: [approval("ask"), http("yes"), http("no")],
+    edges: [
+      { from: "ask", to: "yes", when: "approved" as const },
+      { from: "ask", to: "no", when: "rejected" as const },
+    ],
+  };
+
+  it("waits while a step is waiting, and does not run what comes after it", () => {
+    assert.deepEqual(findNextAction(withDelay, new Map([["wait", waiting]])), { type: "wait" });
+  });
+
+  it("carries on once the wait is over", () => {
+    assert.deepEqual(findNextAction(withDelay, new Map([["wait", done()]])), { type: "run", stepId: "after" });
+  });
+
+  it("runs another branch while one branch waits", () => {
+    const parallel = { steps: [delay("wait"), http("other")], edges: [] };
+    assert.deepEqual(findNextAction(parallel, new Map([["wait", waiting]])), { type: "run", stepId: "other" });
+  });
+
+  it("does not finish until every waiting step is done", () => {
+    const parallel = { steps: [delay("wait"), http("other")], edges: [] };
+    assert.deepEqual(findNextAction(parallel, new Map([["wait", waiting], ["other", done()]])), { type: "wait" });
+  });
+
+  it("follows the error path instead of stopping the run", () => {
+    assert.deepEqual(findNextAction(withErrorPath, new Map([["risky", failed]])), { type: "skip", stepId: "next" });
+    const states = new Map<string, StepState>([["risky", failed], ["next", { status: "skipped", output: null }]]);
+    assert.deepEqual(findNextAction(withErrorPath, states), { type: "run", stepId: "cleanup" });
+  });
+
+  it("does not follow the error path when the step succeeded", () => {
+    const states = new Map<string, StepState>([["risky", done()], ["next", done()]]);
+    assert.deepEqual(findNextAction(withErrorPath, states), { type: "skip", stepId: "cleanup" });
+  });
+
+  it("counts a handled failure as a successful run", () => {
+    const states = new Map<string, StepState>([["risky", failed], ["next", { status: "skipped", output: null }], ["cleanup", done()]]);
+    assert.deepEqual(findNextAction(withErrorPath, states), { type: "finish", status: "succeeded" });
+  });
+
+  it("follows the branch that matches the approval decision", () => {
+    assert.deepEqual(findNextAction(withApproval, new Map([["ask", done({ decision: "rejected" })]])), { type: "skip", stepId: "yes" });
+    const states = new Map<string, StepState>([["ask", done({ decision: "rejected" })], ["yes", { status: "skipped", output: null }]]);
+    assert.deepEqual(findNextAction(withApproval, states), { type: "run", stepId: "no" });
+  });
+
+  it("rejects a normal edge from an Approval step", () => {
+    const result = workflowDefinitionSchema.safeParse({ steps: [approval("ask"), http("b")], edges: [{ from: "ask", to: "b" }] });
+    assert.equal(result.success, false);
+  });
+
+  it("allows an error edge from any kind of step", () => {
+    const result = workflowDefinitionSchema.safeParse({ steps: [ifStep("a"), http("b")], edges: [{ from: "a", to: "b", when: "error" }] });
+    assert.equal(result.success, true);
+  });
+
+  it("rejects a delay longer than 7 days", () => {
+    const tooLong = { id: "a", name: "a", type: "delay", config: { amount: 8, unit: "days" } };
+    assert.equal(workflowDefinitionSchema.safeParse({ steps: [tooLong], edges: [] }).success, false);
+  });
+});
+
 describe("If step", () => {
   it("treats the number 5 and the text 5 as equal", () => {
     assert.deepEqual(runIfStep({ left: 5, operator: "equals", right: "5" }), { result: true });

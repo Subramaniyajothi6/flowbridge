@@ -37,6 +37,7 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
     const { token } = params.parse(request.params);
     const [workflow] = await db.select().from(workflows).where(eq(workflows.webhookToken, token));
     if (!workflow) return reply.status(404).send({ error: "Webhook not found" });
+    if (!workflow.currentVersionId) return reply.status(409).send({ error: "This workflow has not been published yet" });
 
     const rawBody = request.body as Buffer | undefined;
 
@@ -59,7 +60,7 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
     // The run is saved before we reply, so an accepted event cannot be lost.
     const { run, isDuplicate } = await createRun({
       workflowId: workflow.id,
-      versionId: workflow.currentVersionId as string,
+      versionId: workflow.currentVersionId,
       triggerType: "webhook",
       triggerData: { body, query: request.query, headers: removeSensitiveHeaders(request.headers) },
       idempotencyKey,

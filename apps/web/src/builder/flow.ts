@@ -1,6 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import { humanize } from "../format.ts";
-import type { ConnectorInfo, Definition, StepRun, StepStatus, WorkflowEdge, WorkflowStep } from "../types.ts";
+import type { ConnectorConfig, ConnectorInfo, Definition, StepRun, StepStatus, WorkflowEdge, WorkflowStep } from "../types.ts";
 
 // The server stores steps and edges. The canvas library wants nodes and edges.
 // This file converts between the two, so nothing else needs to know the difference.
@@ -13,14 +13,16 @@ export type FlowNode = Node<FlowNodeData>;
 const COLUMN_WIDTH = 300;
 const ROW_HEIGHT = 140;
 
+// True, False, Approved and Rejected are already written beside their dots on the step.
+const EDGE_LABELS: Record<string, string> = { error: "On error" };
+
 function makeEdge(source: string, sourceHandle: string, target: string): Edge {
-  const isBranch = sourceHandle === "true" || sourceHandle === "false";
   return {
     id: `${source}:${sourceHandle}:${target}`,
     source,
     sourceHandle,
     target,
-    label: isBranch ? (sourceHandle === "true" ? "True" : "False") : undefined,
+    label: EDGE_LABELS[sourceHandle],
   };
 }
 
@@ -95,17 +97,29 @@ export function findProblems(nodes: FlowNode[], edges: Edge[], connectors: Conne
 
     if (!edges.some((edge) => edge.target === step.id)) problems.push(`"${step.name}" is not connected to anything before it.`);
     if (step.type === "http_request" && !step.config.url.trim()) problems.push(`"${step.name}" needs a URL.`);
-    if (step.type === "if" && !edges.some((edge) => edge.source === step.id)) problems.push(`"${step.name}" has no step after it.`);
+    if ((step.type === "if" || step.type === "approval") && !edges.some((edge) => edge.source === step.id)) problems.push(`"${step.name}" has no step after it.`);
+    if (step.type === "approval" && !step.config.message.trim()) problems.push(`"${step.name}" needs a message for the person deciding.`);
+    if (step.type === "delay" && !(step.config.amount >= 1)) problems.push(`"${step.name}" needs a wait of at least 1.`);
+    if (step.type === "connector") problems.push(...findConnectorProblems(step.name, step.config, connectors));
 
-    if (step.type === "connector") {
-      if (!step.config.connectionId) problems.push(`"${step.name}" needs a connection.`);
-      const action = connectors.find((item) => item.id === step.config.connector)?.actions.find((item) => item.id === step.config.action);
-      for (const field of action?.inputSchema.required ?? []) {
-        const value = step.config.params[field];
-        if (value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) {
-          problems.push(`"${step.name}" needs a value for ${humanize(field).toLowerCase()}.`);
-        }
-      }
+    if (step.type === "loop") {
+      if (!String(step.config.items ?? "").trim()) problems.push(`"${step.name}" needs a list to go through.`);
+      const action = step.config.action;
+      if (action.type === "http_request" && !action.config.url.trim()) problems.push(`"${step.name}" needs a URL.`);
+      if (action.type === "connector") problems.push(...findConnectorProblems(step.name, action.config, connectors));
+    }
+  }
+  return problems;
+}
+
+function findConnectorProblems(stepName: string, config: ConnectorConfig, connectors: ConnectorInfo[]): string[] {
+  const problems: string[] = [];
+  if (!config.connectionId) problems.push(`"${stepName}" needs a connection.`);
+  const action = connectors.find((item) => item.id === config.connector)?.actions.find((item) => item.id === config.action);
+  for (const field of action?.inputSchema.required ?? []) {
+    const value = config.params[field];
+    if (value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) {
+      problems.push(`"${stepName}" needs a value for ${humanize(field).toLowerCase()}.`);
     }
   }
   return problems;

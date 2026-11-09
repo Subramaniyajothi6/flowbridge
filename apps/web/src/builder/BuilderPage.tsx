@@ -1,12 +1,13 @@
 import { addEdge, useEdgesState, useNodesState, type Connection as FlowConnection, type Edge, type EdgeChange, type NodeChange } from "@xyflow/react";
-import { ChevronLeft, LayoutGrid, Play, Rows3, Save } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, FlaskConical, LayoutGrid, Rocket, Rows3, Save, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api.ts";
+import { useAuth } from "../auth.tsx";
 import { StatusBadge } from "../components/StatusBadge.tsx";
-import { HttpIcon, IfIcon, ServiceLogo } from "../components/StepIcon.tsx";
+import { ApprovalIcon, DelayIcon, HttpIcon, IfIcon, LoopIcon, ServiceLogo } from "../components/StepIcon.tsx";
 import { formatDuration, humanize } from "../format.ts";
-import type { ConnectorInfo, RunDetail, Samples, Trigger, WorkflowDetail, WorkflowStep } from "../types.ts";
+import type { ConnectorInfo, Definition, PublicationStatus, RunDetail, Samples, Trigger, WorkflowDetail, WorkflowStep } from "../types.ts";
 import { useLoad } from "../useLoad.ts";
 import type { DataGroup } from "./fields.tsx";
 import { connectionToEdge, definitionToFlow, findProblems, flowToDefinition, listSampleValues, statusMap, stepsBefore, TRIGGER_ID, uniqueStepId, wouldCreateLoop, type FlowNode } from "./flow.ts";
@@ -19,6 +20,18 @@ const COLUMN_GAP = 300;
 function summarize(triggers: Trigger[]): string {
   const active = triggers.filter((trigger) => trigger.enabled).length;
   return active === 0 ? "Manual or webhook" : `Manual, webhook + ${active} more`;
+}
+
+function PaletteItem({ icon, label, description, onClick }: { icon: ReactNode; label: string; description: string; onClick: () => void }) {
+  return (
+    <button className="pal-i" title={description} onClick={onClick}>
+      {icon}
+      <span className="grow">
+        <span className="strong trunc pal-label">{label}</span>
+        <span className="small muted trunc pal-desc">{description}</span>
+      </span>
+    </button>
+  );
 }
 
 export function BuilderPage() {
@@ -37,14 +50,21 @@ export function BuilderPage() {
 
 function Builder({ initial }: { initial: WorkflowDetail }) {
   const workflowId = initial.id;
-  const latest = initial.versions[0];
+  const { can } = useAuth();
+  const canEdit = can("workflows.edit");
 
-  const flow = useMemo(() => definitionToFlow(latest.definition, "Manual or webhook"), [latest]);
+  // Opens saved edits if there are any, and otherwise what is published.
+  const flow = useMemo(() => {
+    const emptyDefinition: Definition = { steps: [], edges: [] };
+    return definitionToFlow(initial.draftDefinition ?? initial.versions[0]?.definition ?? emptyDefinition, "Manual or webhook");
+  }, [initial]);
   const [nodes, setNodes, applyNodeChanges] = useNodesState<FlowNode>(flow.nodes);
   const [edges, setEdges, applyEdgeChanges] = useEdgesState<Edge>(flow.edges);
 
   const [name, setName] = useState(initial.name);
-  const [version, setVersion] = useState(latest.versionNumber);
+  const [publishedVersion, setPublishedVersion] = useState<number | null>(initial.versions[0]?.versionNumber ?? null);
+  const [publication, setPublication] = useState<PublicationStatus>(initial.status);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
@@ -54,6 +74,7 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
   const [samples, setSamples] = useState<Samples>({ trigger: null, steps: {} });
   const [liveRun, setLiveRun] = useState<RunDetail | null>(null);
   const [hasEditedTestData, setHasEditedTestData] = useState(false);
+  const [stepSearch, setStepSearch] = useState("");
 
   const connectors = useLoad(api.listConnectors);
   const connections = useLoad(api.listConnections);
@@ -155,9 +176,9 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
 
     setIsSaving(true);
     try {
-      await api.saveVersion(workflowId, flowToDefinition(nodes, edges));
+      const saved = await api.saveDraft(workflowId, flowToDefinition(nodes, edges));
       if (name.trim() && name !== initial.name) await api.renameWorkflow(workflowId, name.trim());
-      setVersion((current) => current + 1);
+      setPublication(saved.status);
       setIsDirty(false);
       return true;
     } catch (problem) {
@@ -168,7 +189,25 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
     }
   }
 
-  async function run() {
+  async function publish() {
+    const found = findProblems(nodes, edges, connectorList);
+    setProblems(found);
+    if (found.length > 0 || (isDirty && !(await save()))) return;
+
+    setIsPublishing(true);
+    try {
+      const published = await api.publish(workflowId);
+      setPublication(published.status);
+      setPublishedVersion(published.versionNumber);
+      setProblems([]);
+    } catch (problem) {
+      setProblems([(problem as Error).message]);
+    } finally {
+      setIsPublishing(false);
+    }
+  }
+
+  async function testWorkflow() {
     if (isDirty && !(await save())) return;
 
     let data: unknown = {};
@@ -181,7 +220,7 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
 
     try {
       setProblems([]);
-      const started = await api.startRun(workflowId, data);
+      const started = await api.testWorkflow(workflowId, data);
       watchRun(started.id);
     } catch (problem) {
       setProblems([(problem as Error).message]);
@@ -194,7 +233,8 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
     const check = async () => {
       const current = await api.getRun(runId);
       setLiveRun(current);
-      if (current.status === "succeeded" || current.status === "failed") {
+      // A waiting run can stay that way for days, so the builder stops watching it.
+      if (current.status === "succeeded" || current.status === "failed" || current.status === "waiting") {
         if (pollTimer.current) window.clearInterval(pollTimer.current);
         await loadSamples();
       }
@@ -234,19 +274,41 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
   const statuses = useMemo(() => statusMap(liveRun?.steps ?? []), [liveRun]);
   const isRunActive = liveRun?.status === "queued" || liveRun?.status === "running";
 
+  const matchesSearch = (...texts: string[]) => texts.join(" ").toLowerCase().includes(stepSearch.trim().toLowerCase());
+
+  const coreSteps = [
+    { label: "HTTP request", description: "Call any web API", icon: <HttpIcon />, add: () => addStep((stepId, stepName) => ({ id: stepId, name: stepName, type: "http_request", config: { method: "GET", url: "", headers: {} } }), "http_request", "HTTP request") },
+    { label: "If / else", description: "Choose a path based on a condition", icon: <IfIcon />, add: () => addStep((stepId, stepName) => ({ id: stepId, name: stepName, type: "if", config: { left: "", operator: "equals", right: "" } }), "if_step", "If") },
+    { label: "Delay", description: "Wait for a set time before carrying on", icon: <DelayIcon />, add: () => addStep((stepId, stepName) => ({ id: stepId, name: stepName, type: "delay", config: { amount: 5, unit: "minutes" } }), "delay", "Delay") },
+    { label: "Approval", description: "Pause until a person approves or rejects", icon: <ApprovalIcon />, add: () => addStep((stepId, stepName) => ({ id: stepId, name: stepName, type: "approval", config: { message: "Please review this request.", timeoutHours: 24 } }), "approval", "Approval") },
+    { label: "Loop", description: "Repeat an action for each item in a list", icon: <LoopIcon />, add: () => addStep((stepId, stepName) => ({ id: stepId, name: stepName, type: "loop", config: { items: "", action: { type: "http_request", config: { method: "POST", url: "", headers: {} } } } }), "loop", "Loop") },
+  ].filter((item) => matchesSearch(item.label, item.description));
+
+  const connectorGroups = connectorList
+    .map((connector) => ({ connector, actions: connector.actions.filter((action) => matchesSearch(connector.name, humanize(action.id), action.description)) }))
+    .filter((group) => group.actions.length > 0);
+
   return (
     <div className={`b-root ${view === "tile" ? "b-tile" : ""}`}>
       <header className="b-top">
         <Link className="btn btn-g btn-ic" to="/workflows" aria-label="Back to workflows"><ChevronLeft size={17} aria-hidden="true" /></Link>
-        <input className="b-name" aria-label="Workflow name" value={name} onChange={(event) => { setName(event.target.value); setIsDirty(true); }} />
-        <span className="small muted b-desk">Version {version}{isDirty ? ", unsaved changes" : ""}</span>
+        <input className="b-name" aria-label="Workflow name" readOnly={!canEdit} value={name} onChange={(event) => { setName(event.target.value); setIsDirty(true); }} />
+        <span className={`badge b-desk ${publishedVersion === null ? "b-off" : "b-ok"}`}>{publishedVersion === null ? "Draft" : `Published, Version ${publishedVersion}`}</span>
+        <span className="small muted b-desk">
+          {!canEdit ? "Read-only" : isDirty ? "Unsaved changes" : publication === "published_with_edits" ? `Draft saved. Version ${publishedVersion} stays live.` : ""}
+        </span>
         <div className="grow" />
         <div className="seg-ctl b-desk" role="group" aria-label="Node style">
           <button className={view === "card" ? "is-on" : ""} aria-pressed={view === "card"} onClick={() => setView("card")}><Rows3 size={13} aria-hidden="true" /> Card</button>
           <button className={view === "tile" ? "is-on" : ""} aria-pressed={view === "tile"} onClick={() => setView("tile")}><LayoutGrid size={13} aria-hidden="true" /> Tile</button>
         </div>
-        <button className="btn b-desk" onClick={save} disabled={!isDirty || isSaving}><Save size={14} aria-hidden="true" /> {isSaving ? "Saving..." : "Save"}</button>
-        <button className="btn btn-p b-desk" onClick={run} disabled={isRunActive}><Play size={14} aria-hidden="true" /> Run</button>
+        {canEdit && (
+          <>
+            <button className="btn b-desk" onClick={save} disabled={!isDirty || isSaving}><Save size={14} aria-hidden="true" /> {isSaving ? "Saving..." : "Save"}</button>
+            <button className="btn b-desk" onClick={testWorkflow} disabled={isRunActive} title="Runs for real, but is marked as a test and left out of the statistics"><FlaskConical size={14} aria-hidden="true" /> Test workflow</button>
+            <button className="btn btn-p b-desk" onClick={publish} disabled={isPublishing || (publication === "published" && !isDirty)}><Rocket size={14} aria-hidden="true" /> {isPublishing ? "Publishing..." : "Publish"}</button>
+          </>
+        )}
       </header>
 
       {problems.length > 0 && (
@@ -256,42 +318,45 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
       )}
 
       <div className="b-body">
-        <aside className="b-pal" aria-label="Add a step">
+        {canEdit && <aside className="b-pal" aria-label="Add a step">
+          <div className="pal-title">What happens next?</div>
+          <div className="pal-search">
+            <span className="search-ic"><Search size={14} aria-hidden="true" /></span>
+            <input className="input" type="search" aria-label="Search steps" placeholder="Search steps and apps" value={stepSearch} onChange={(event) => setStepSearch(event.target.value)} />
+          </div>
           <div className="b-pal-scroll">
-            <div className="pal-h">CORE</div>
-            <button className="pal-i" onClick={() => addStep((stepId, stepName) => ({ id: stepId, name: stepName, type: "http_request", config: { method: "GET", url: "", headers: {} } }), "http_request", "HTTP request")}>
-              <HttpIcon /> HTTP request
-            </button>
-            <button className="pal-i" onClick={() => addStep((stepId, stepName) => ({ id: stepId, name: stepName, type: "if", config: { left: "", operator: "equals", right: "" } }), "if_step", "If")}>
-              <IfIcon /> If / else
-            </button>
-            {connectorList.map((connector) => (
+            {coreSteps.length > 0 && <div className="pal-h">CORE</div>}
+            {coreSteps.map((item) => (
+              <PaletteItem key={item.label} icon={item.icon} label={item.label} description={item.description} onClick={item.add} />
+            ))}
+            {connectorGroups.map(({ connector, actions }) => (
               <div key={connector.id}>
                 <div className="pal-h">{connector.name.toUpperCase()}</div>
-                {connector.actions.map((action) => (
-                  <button
+                {actions.map((action) => (
+                  <PaletteItem
                     key={action.id}
-                    className="pal-i"
-                    title={action.description}
+                    icon={<ServiceLogo connector={connector.id} />}
+                    label={humanize(action.id)}
+                    description={action.description}
                     onClick={() => addStep(
                       (stepId, stepName) => ({ id: stepId, name: stepName, type: "connector", config: { connector: connector.id, action: action.id, connectionId: (connections.data ?? []).find((item) => item.connector === connector.id)?.id ?? "", params: {} } }),
                       `${connector.id}_${action.id}`,
                       humanize(action.id),
                     )}
-                  >
-                    <ServiceLogo connector={connector.id} /> {humanize(action.id)}
-                  </button>
+                  />
                 ))}
               </div>
             ))}
+            {coreSteps.length === 0 && connectorGroups.length === 0 && <p className="hint pal-none">No steps match your search.</p>}
           </div>
-        </aside>
+        </aside>}
 
         <main className="b-center" style={{ position: "relative" }}>
           <WorkflowCanvas
             nodes={nodes}
             edges={edges}
             statuses={statuses}
+            readOnly={!canEdit}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -309,6 +374,7 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
 
         {selectedNode && (
           <aside className="b-cfg" aria-label="Settings">
+            <fieldset className="plain-fieldset" disabled={!canEdit}>
             {selectedStep ? (
               <StepPanel
                 key={selectedStep.id}
@@ -330,6 +396,7 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
                 onChanged={triggers.reload}
               />
             )}
+            </fieldset>
           </aside>
         )}
       </div>
@@ -342,6 +409,8 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
 // An If step fills its True branch first, then its False branch.
 function chooseHandle(source: FlowNode, edges: Edge[]): string {
   if (source.id === TRIGGER_ID) return "start";
-  if (source.data.step?.type !== "if") return "success";
-  return edges.some((edge) => edge.source === source.id && edge.sourceHandle === "true") ? "false" : "true";
+  const hasBranch = (handle: string) => edges.some((edge) => edge.source === source.id && edge.sourceHandle === handle);
+  if (source.data.step?.type === "if") return hasBranch("true") ? "false" : "true";
+  if (source.data.step?.type === "approval") return hasBranch("approved") ? "rejected" : "approved";
+  return "success";
 }

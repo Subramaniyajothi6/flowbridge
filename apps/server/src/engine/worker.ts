@@ -6,6 +6,7 @@ import { runs } from "../db/schema.ts";
 import { fireDueTriggers } from "../triggers/fire-triggers.ts";
 import { advanceRun } from "./advance-run.ts";
 import { ADVANCE_RUN_QUEUE, enqueueAdvanceRun, boss, type AdvanceRunJob } from "./queue.ts";
+import { resumeDueWaits } from "./waits.ts";
 
 const workerId = randomUUID();
 
@@ -21,11 +22,13 @@ export async function startWorker(): Promise<() => void> {
 
   const stopSweep = repeatWithoutOverlap(sweepAbandonedRuns, config.SWEEP_SECONDS, "Sweep");
   const stopTriggers = repeatWithoutOverlap(fireDueTriggers, config.TRIGGER_TICK_SECONDS, "Triggers");
+  const stopWaits = repeatWithoutOverlap(resumeDueWaits, config.TRIGGER_TICK_SECONDS, "Waits");
 
   console.log(`Worker ${workerId} started`);
   return () => {
     stopSweep();
     stopTriggers();
+    stopWaits();
   };
 }
 

@@ -1,8 +1,51 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { WorkflowDefinition } from "../engine/definition.ts";
 import type { PollConfig, PollCursor, ScheduleConfig } from "../triggers/definition.ts";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
+
+export type Role = "administrator" | "workflow_creator" | "business_user" | "technical_operator";
+
+// There is one workspace per installation, so this table has a single row.
+export const workspace = pgTable("workspace", {
+  id: integer("id").primaryKey().default(1),
+  name: text("name").notNull(),
+  // The most live runs allowed in a calendar month.
+  monthlyRunLimit: integer("monthly_run_limit").notNull().default(25000),
+  createdAt: createdAt(),
+});
+
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  // Always stored in lower case.
+  email: text("email").notNull().unique(),
+  role: text("role").$type<Role>().notNull(),
+  // A salted scrypt hash. See auth/passwords.ts.
+  passwordHash: text("password_hash").notNull(),
+  // Set when an Administrator chose the password, until the person changes it.
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  timezone: text("timezone").notNull().default("Asia/Kolkata"),
+  lastSignInAt: timestamp("last_sign_in_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
+
+// Only a hash of the token is stored, so reading this table does not let anyone sign in.
+export const sessions = pgTable("sessions", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+});
+
+// A short record of who did what, shown on the Overview page.
+export const activity = pgTable("activity", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  actorName: text("actor_name").notNull(),
+  description: text("description").notNull(),
+  createdAt: createdAt(),
+});
 
 export const workflows = pgTable("workflows", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -11,8 +54,12 @@ export const workflows = pgTable("workflows", {
   webhookToken: text("webhook_token").notNull().unique(),
   // When set, webhook deliveries must be signed with this secret.
   webhookSecret: text("webhook_secret"),
-  // The version that new runs use.
+  // The published version, which is what real runs use. Empty until first published.
   currentVersionId: uuid("current_version_id"),
+  // Saved edits that have not been published. Empty when there are none.
+  draftDefinition: jsonb("draft_definition").$type<WorkflowDefinition>(),
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: createdAt(),
 });
 
@@ -23,8 +70,10 @@ export const workflowVersions = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     workflowId: uuid("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
-    versionNumber: integer("version_number").notNull(),
+    // Empty for the private copy made for a test run, because that was never published.
+    versionNumber: integer("version_number"),
     definition: jsonb("definition").$type<WorkflowDefinition>().notNull(),
+    publishedBy: text("published_by"),
     createdAt: createdAt(),
   },
   (table) => [unique().on(table.workflowId, table.versionNumber)],
@@ -71,8 +120,9 @@ export const oauthStates = pgTable("oauth_states", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
 
-export type RunStatus = "queued" | "running" | "succeeded" | "failed";
+export type RunStatus = "queued" | "running" | "waiting" | "succeeded" | "failed";
 export type RunTriggerType = "manual" | "webhook" | "schedule" | "poll";
+export type RunMode = "live" | "test";
 
 export const runs = pgTable(
   "runs",
@@ -82,10 +132,16 @@ export const runs = pgTable(
     versionId: uuid("version_id").notNull().references(() => workflowVersions.id),
     status: text("status").$type<RunStatus>().notNull().default("queued"),
     triggerType: text("trigger_type").$type<RunTriggerType>().notNull(),
+    // Test runs are left out of statistics and usage, so testing never skews the numbers.
+    mode: text("mode").$type<RunMode>().notNull().default("live"),
+    // The person who started it, when a person did.
+    startedBy: text("started_by"),
     triggerData: jsonb("trigger_data").notNull(),
     // Stops the same webhook delivery from starting two runs.
     idempotencyKey: text("idempotency_key"),
     error: text("error"),
+    // Set when this run is a retry of an earlier run.
+    retryOfRunId: uuid("retry_of_run_id").references((): AnyPgColumn => runs.id, { onDelete: "set null" }),
     // Which worker owns this run, and until when.
     leaseOwner: text("lease_owner"),
     leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
@@ -94,10 +150,12 @@ export const runs = pgTable(
     startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },
-  (table) => [unique().on(table.workflowId, table.idempotencyKey)],
+  (table) => [unique().on(table.workflowId, table.idempotencyKey), index().on(table.mode, table.createdAt)],
 );
 
-export type StepStatus = "running" | "succeeded" | "failed" | "skipped";
+export type StepStatus = "running" | "waiting" | "succeeded" | "failed" | "skipped";
+export type WaitKind = "delay" | "approval" | "retry";
+export type AttemptRecord = { attempt: number; at: string; error: string; retryInSeconds: number | null };
 
 // One row for each step of each run. This is what lets a run continue after a
 // crash without repeating the steps that already finished.
@@ -112,8 +170,14 @@ export const stepRuns = pgTable(
     input: jsonb("input"),
     output: jsonb("output"),
     error: text("error"),
+    // What this step is waiting for, and when the wait ends.
+    // An approval's end time is when it gives up waiting for a decision.
+    waitKind: text("wait_kind").$type<WaitKind>(),
+    resumeAt: timestamp("resume_at", { withTimezone: true }),
+    // One entry for each failed attempt, so a person can see what happened each time.
+    attemptLog: jsonb("attempt_log").$type<AttemptRecord[]>().notNull().default([]),
     startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },
-  (table) => [unique().on(table.runId, table.stepId)],
+  (table) => [unique().on(table.runId, table.stepId), index().on(table.status, table.resumeAt)],
 );

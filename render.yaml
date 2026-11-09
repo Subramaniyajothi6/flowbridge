@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: flowbridge
+    runtime: node
+    plan: free
+    region: singapore
+    # Development tools are needed to build the interface, so they are included here.
+    buildCommand: npm ci --include=dev && npm run build && npm run db:migrate
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0
+      - key: RUN_MODE
+        value: all
+      - key: ALLOW_PRIVATE_URLS
+        value: "false"
+      # These are secrets, so they are typed into the Render dashboard and never kept here.
+      - key: DATABASE_URL
+        sync: false
+      - key: ENCRYPTION_KEYS
+        sync: false
+      - key: PUBLIC_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { StepIcon } from "../components/StepIcon.tsx";
 import { formatJson, humanize } from "../format.ts";
-import type { Connection, ConnectorConfig, ConnectorInfo, HttpConfig, HttpMethod, IfConfig, IfOperator, WorkflowStep } from "../types.ts";
+import type { ApprovalConfig, Connection, ConnectorConfig, ConnectorInfo, DelayConfig, DelayUnit, HttpConfig, HttpMethod, IfConfig, IfOperator, LoopAction, LoopConfig, RetryPolicy, WorkflowStep } from "../types.ts";
 import { DataField, type DataGroup } from "./fields.tsx";
 
 const methods: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
@@ -49,6 +49,13 @@ export function StepPanel({ step, groups, connectors, connections, onChange, onD
         {step.type === "http_request" && <HttpFields config={step.config} groups={groups} onChange={(config) => onChange({ ...step, config })} />}
         {step.type === "if" && <IfFields config={step.config} groups={groups} onChange={(config) => onChange({ ...step, config })} />}
         {step.type === "connector" && <ConnectorFields config={step.config} groups={groups} connectors={connectors} connections={connections} onChange={(config) => onChange({ ...step, config })} />}
+        {step.type === "delay" && <DelayFields config={step.config} onChange={(config) => onChange({ ...step, config })} />}
+        {step.type === "approval" && <ApprovalFields config={step.config} groups={groups} onChange={(config) => onChange({ ...step, config })} />}
+        {step.type === "loop" && <LoopFields config={step.config} groups={groups} connectors={connectors} connections={connections} onChange={(config) => onChange({ ...step, config })} />}
+
+        {(step.type === "http_request" || step.type === "connector" || step.type === "loop") && <RetryFields retry={step.retry} onChange={(retry) => onChange({ ...step, retry })} />}
+
+        <p className="hint">To run other steps when this one fails, connect the red dot at the bottom of the step.</p>
 
         <div className="field">
           <span className="label">Reference for later steps</span>
@@ -173,6 +180,100 @@ function ConnectorFields({ config, groups, connectors, connections, onChange }: 
         return <DataField key={name} label={humanize(name)} required={required} multiline={name === "body" || name === "text"} value={String(config.params[name] ?? "")} groups={groups} placeholder={schema.default !== undefined ? String(schema.default) : undefined} onChange={(value) => updateParam(name, value)} />;
       })}
     </>
+  );
+}
+
+function numberFrom(text: string): number {
+  return Math.max(0, Math.floor(Number(text) || 0));
+}
+
+const delayUnits: DelayUnit[] = ["seconds", "minutes", "hours", "days"];
+
+function DelayFields({ config, onChange }: { config: DelayConfig; onChange: (config: DelayConfig) => void }) {
+  return (
+    <div className="field">
+      <span className="label">Wait for <span className="req">*</span></span>
+      <div className="row">
+        <input className="input" type="number" min={1} aria-label="Amount of time" value={config.amount} onChange={(event) => onChange({ ...config, amount: numberFrom(event.target.value) })} />
+        <select className="select" aria-label="Unit of time" value={config.unit} onChange={(event) => onChange({ ...config, unit: event.target.value as DelayUnit })}>
+          {delayUnits.map((unit) => <option key={unit} value={unit}>{humanize(unit)}</option>)}
+        </select>
+      </div>
+      <span className="hint">The longest wait is 7 days. Waits are checked every 20 seconds.</span>
+    </div>
+  );
+}
+
+function ApprovalFields({ config, groups, onChange }: { config: ApprovalConfig; groups: DataGroup[]; onChange: (config: ApprovalConfig) => void }) {
+  return (
+    <>
+      <DataField label="Message for the person deciding" required multiline value={config.message} groups={groups} onChange={(message) => onChange({ ...config, message })} />
+      <div className="field">
+        <label className="label" htmlFor="approval-timeout">Give up after (hours)</label>
+        <input id="approval-timeout" className="input" type="number" min={1} max={168} value={config.timeoutHours} onChange={(event) => onChange({ ...config, timeoutHours: numberFrom(event.target.value) })} />
+        <span className="hint">If nobody decides in time, the step fails. The decision is made on the run's page.</span>
+      </div>
+    </>
+  );
+}
+
+function LoopFields({ config, groups, connectors, connections, onChange }: { config: LoopConfig; groups: DataGroup[]; connectors: ConnectorInfo[]; connections: Connection[]; onChange: (config: LoopConfig) => void }) {
+  const action = config.action;
+  const itemGroups: DataGroup[] = [{ title: "Current item", items: [{ path: "loop.item", preview: "The item itself" }, { path: "loop.index", preview: "Its position, from 0" }] }, ...groups];
+  const chosen = action.type === "connector" ? `${action.config.connector}:${action.config.action}` : "http_request";
+
+  function chooseAction(value: string) {
+    if (value === "http_request") {
+      onChange({ ...config, action: { type: "http_request", config: { method: "POST", url: "", headers: {} } } });
+      return;
+    }
+    const [connector, actionId] = value.split(":");
+    const connectionId = connections.find((item) => item.connector === connector)?.id ?? "";
+    onChange({ ...config, action: { type: "connector", config: { connector, action: actionId, connectionId, params: {} } } });
+  }
+
+  const updateAction = (next: LoopAction) => onChange({ ...config, action: next });
+
+  return (
+    <>
+      <DataField label="Items" required value={String(config.items ?? "")} groups={groups} placeholder="{{steps.get_orders.output.items}}" hint="A list from an earlier step. At most 100 items." onChange={(items) => onChange({ ...config, items })} />
+      <div className="field">
+        <label className="label" htmlFor="loop-action">Action for each item</label>
+        <select id="loop-action" className="select" value={chosen} onChange={(event) => chooseAction(event.target.value)}>
+          <option value="http_request">HTTP request</option>
+          {connectors.flatMap((connector) => connector.actions.map((item) => (
+            <option key={`${connector.id}:${item.id}`} value={`${connector.id}:${item.id}`}>{connector.name}: {humanize(item.id)}</option>
+          )))}
+        </select>
+      </div>
+      {action.type === "http_request" && <HttpFields key="http" config={action.config} groups={itemGroups} onChange={(next) => updateAction({ type: "http_request", config: next })} />}
+      {action.type === "connector" && <ConnectorFields key={chosen} config={action.config} groups={itemGroups} connectors={connectors} connections={connections} onChange={(next) => updateAction({ type: "connector", config: next })} />}
+    </>
+  );
+}
+
+function RetryFields({ retry, onChange }: { retry?: RetryPolicy; onChange: (retry: RetryPolicy | undefined) => void }) {
+  const maxAttempts = retry?.maxAttempts ?? 1;
+  const delaySeconds = retry?.delaySeconds ?? 30;
+
+  return (
+    <div className="field">
+      <label className="label" htmlFor="retry-attempts">If this step fails</label>
+      <select id="retry-attempts" className="select" value={maxAttempts} onChange={(event) => {
+        const attempts = Number(event.target.value);
+        onChange(attempts === 1 ? undefined : { maxAttempts: attempts, delaySeconds });
+      }}>
+        <option value={1}>Do not retry</option>
+        {[2, 3, 4, 5].map((attempts) => <option key={attempts} value={attempts}>Try up to {attempts} times</option>)}
+      </select>
+      {maxAttempts > 1 && (
+        <>
+          <label className="label" htmlFor="retry-delay">Seconds before the first retry</label>
+          <input id="retry-delay" className="input" type="number" min={1} max={3600} value={delaySeconds} onChange={(event) => onChange({ maxAttempts, delaySeconds: Math.max(1, numberFrom(event.target.value)) })} />
+          <span className="hint">The wait doubles after each retry.</span>
+        </>
+      )}
+    </div>
   );
 }
 

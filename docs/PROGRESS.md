@@ -8,6 +8,15 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Log (newest first)
 
+### 2026-11-10, laptop
+- Reviewed the stage 4 screens against the prototype and fixed the differences on Integrations, the run page and the builder.
+- Built stage 5: delay, approval, loop, retries with increasing waits, error paths, retry from failed step and run from start.
+- Built stage 6: sign-in, the four roles enforced on the server, Team, Settings, draft and publish, test runs, Overview, Analytics, system health and the monthly run limit.
+- Built stage 7 apart from going live: public Home page, Docs, Templates, deployment settings and the documents the assignment asks for.
+- Tested with 106 automated checks, the crash test, 75 end-to-end checks against the real database, and a browser review as all four roles and at phone width. Results are in `docs/TESTING.md`.
+- After `npm run build`, a restart is no longer needed.
+- Demo accounts now exist in the shared database. Their password is in `flowbridge-html/README.txt`.
+
 ### 2026-11-09, laptop
 - Built the visual builder and execution screens (stage 4). Code is committed and pushed.
 - Tested by driving the real interface in a headless browser against the real database: create a workflow, add steps, blocked save on a blank URL, single-step test, data picker, branching, save, run, live status on the canvas, execution details, reload, Integrations page, small-screen message. All passed with no browser errors.
@@ -21,17 +30,17 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 | 1. Run engine with crash recovery | Done |
 | 2. Triggers: webhook, schedule, polling | Done |
 | 3. Connections and integrations | Done, proven with real accounts |
-| 4. Visual builder and execution screens | Built and tested, visual review still to do |
-| 5. Pauses and recovery: delay, approval, loops, retries, error paths, retry from failed step | Not started |
-| 6. Sign-in, the four roles, draft and publish, monitoring, usage limits | Not started |
-| 7. Public Home page, Sign in and remaining designed pages, deployment, testing report | Not started |
-
-The API and all screens have **no sign-in yet**. Do not deploy publicly until stage 6 is done.
+| 4. Visual builder and execution screens | Done, reviewed against the prototype |
+| 5. Pauses and recovery: delay, approval, loops, retries, error paths, retry from failed step | Done and tested |
+| 6. Sign-in, the four roles, draft and publish, monitoring, usage limits | Done and tested |
+| 7. Public Home page, Sign in and remaining designed pages, deployment, testing report | Built. Going live is still to do |
 
 ## Next
 
-1. Open the app and review every screen by eye against the design prototype. Fix anything that looks wrong.
-2. Build stage 5.
+1. Deploy on Render, following the Deployment section of `README.md`.
+2. Before sharing the address, change the demo password by running the seed command with a new `SEED_PASSWORD`.
+3. Test the "Welcome new customers" template with real accounts. It needs a spreadsheet with Customers and Tasks tabs.
+4. Add the deployment link to the README and the final demonstration notes.
 
 ## Setting up a new machine
 
@@ -46,13 +55,14 @@ Then:
 git clone https://github.com/Subramaniyajothi6/flowbridge.git
 cd flowbridge
 npm install
+npm run db:migrate
 npm run build
 npm start
 ```
 
 Open http://localhost:3000.
 
-`npm start` serves the built interface and the API from one process, which is the lightest way to run. After changing frontend code, run `npm run build` again. On a machine with enough memory, run `npm run dev` for the server and `npm run dev --workspace apps/web` for live frontend reloading.
+`npm start` serves the built interface and the API from one process, which is the lightest way to run. After changing frontend code, run `npm run build` again. After changing server code, restart it. On a machine with enough memory, run `npm run dev` for the server and `npm run dev --workspace apps/web` for live frontend reloading.
 
 ## Where things are
 
@@ -100,4 +110,6 @@ Outside this repository, in the laptop's `D:\Adz4\FlowBridge Project` folder:
 - Google connections expire 7 days after connecting, while the Google project is in Testing status. The current ones expire around 2026-11-16. Reconnect them on the Integrations page shortly before any demo.
 - Stripe is a sandbox registered as a United States account only because Stripe is invitation-only in India. Keep it in test mode and never activate it.
 - The Render free host sleeps after 15 minutes idle. Open the site a few minutes before a demonstration.
-- Test accounts from the prototype, for the sign-in stage: jonah@ (Administrator), priya@ (Workflow Creator), rahul@ (Technical Operator), lena@ (Business User), all at meridianlogistics.example.
+- Demo accounts: jonah@ (Administrator), priya@ (Workflow Creator), rahul@ (Technical Operator), lena@ (Business User), all at meridianlogistics.example.
+- A draft workflow "Welcome new customers" is in the workspace, made from the template, ready for its spreadsheet ID.
+- To test a workflow that uses webhook data, enter test data as `{ "body": { "name": "Asha", "email": "you@example.com", "company": "Acme" } }`.

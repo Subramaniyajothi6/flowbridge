@@ -1,6 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { requirePermission } from "../auth/sessions.ts";
 import { db } from "../db/client.ts";
 import { triggers, workflows } from "../db/schema.ts";
 import {
@@ -27,13 +28,15 @@ function firstFireTime(type: Trigger["type"], config: ScheduleConfig | PollConfi
 }
 
 export function registerTriggerRoutes(app: FastifyInstance): void {
-  app.get("/api/workflows/:id/triggers", async (request) => {
+  const canEdit = { preHandler: requirePermission("workflows.edit") };
+
+  app.get("/api/workflows/:id/triggers", { preHandler: requirePermission("builder.view") }, async (request) => {
     const { id } = idParams.parse(request.params);
     const rows = await db.select().from(triggers).where(eq(triggers.workflowId, id)).orderBy(desc(triggers.createdAt));
     return rows.map(toPublicTrigger);
   });
 
-  app.post("/api/workflows/:id/triggers", async (request, reply) => {
+  app.post("/api/workflows/:id/triggers", canEdit, async (request, reply) => {
     const { id } = idParams.parse(request.params);
     const body = createTriggerSchema.parse(request.body);
     const [workflow] = await db.select({ id: workflows.id }).from(workflows).where(eq(workflows.id, id));
@@ -46,7 +49,7 @@ export function registerTriggerRoutes(app: FastifyInstance): void {
     return reply.status(201).send(toPublicTrigger(created));
   });
 
-  app.patch("/api/triggers/:id", async (request, reply) => {
+  app.patch("/api/triggers/:id", canEdit, async (request, reply) => {
     const { id } = idParams.parse(request.params);
     const { enabled } = updateTriggerBody.parse(request.body);
     const [existing] = await db.select().from(triggers).where(eq(triggers.id, id));
@@ -61,7 +64,7 @@ export function registerTriggerRoutes(app: FastifyInstance): void {
     return toPublicTrigger(updated);
   });
 
-  app.delete("/api/triggers/:id", async (request, reply) => {
+  app.delete("/api/triggers/:id", canEdit, async (request, reply) => {
     const { id } = idParams.parse(request.params);
     const [deleted] = await db.delete(triggers).where(eq(triggers.id, id)).returning({ id: triggers.id });
     if (!deleted) return reply.status(404).send({ error: "Trigger not found" });

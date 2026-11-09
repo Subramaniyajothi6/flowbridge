@@ -22,6 +22,20 @@
       "when": 1794230665475,
       "tag": "0002_absurd_rachel_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794252578141,
+      "tag": "0003_tricky_calypso",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794252993927,
+      "tag": "0004_typical_mojo",
+      "breakpoints": true
     }
   ]
 }

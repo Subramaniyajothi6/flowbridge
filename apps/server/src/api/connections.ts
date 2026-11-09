@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import { and, desc, eq, gt, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { recordActivity } from "../auth/activity.ts";
+import { currentUser, requirePermission } from "../auth/sessions.ts";
 import { openConnection } from "../connections/client.ts";
 import {
   buildAuthorizeUrl,
@@ -41,6 +43,10 @@ const publicColumns = {
   createdAt: connections.createdAt,
 };
 
+function humanizeConnector(connectorId: string): string {
+  return getConnector(connectorId)?.name ?? connectorId;
+}
+
 function isConfigured(connector: Connector): boolean {
   return connector.auth.type === "token" || isProviderConfigured(connector.auth.provider);
 }
@@ -79,13 +85,16 @@ async function verifyConnection(connectionId: string): Promise<string> {
 }
 
 export function registerConnectionRoutes(app: FastifyInstance): void {
-  app.get("/api/connectors", async () => Object.values(connectors).map(describeConnector));
+  const canView = { preHandler: requirePermission("integrations.view") };
+  const canManage = { preHandler: requirePermission("integrations.manage") };
 
-  app.get("/api/connections", async () => {
+  app.get("/api/connectors", canView, async () => Object.values(connectors).map(describeConnector));
+
+  app.get("/api/connections", canView, async () => {
     return db.select(publicColumns).from(connections).orderBy(desc(connections.createdAt));
   });
 
-  app.post("/api/connections", async (request, reply) => {
+  app.post("/api/connections", canManage, async (request, reply) => {
     const body = createTokenConnectionBody.parse(request.body);
     const connector = getConnector(body.connector);
     if (!connector || connector.auth.type !== "token") {
@@ -98,6 +107,7 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
     const id = await saveConnection(connector, body.name ?? connector.name, { type: "token", token: body.token });
     try {
       const account = await verifyConnection(id);
+      await recordActivity(currentUser(request).name, `connected ${connector.name}`);
       return reply.status(201).send({ id, account });
     } catch (error) {
       // A credential that does not work is not kept.
@@ -106,7 +116,7 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
     }
   });
 
-  app.post("/api/connections/:id/test", async (request) => {
+  app.post("/api/connections/:id/test", canView, async (request) => {
     const { id } = idParams.parse(request.params);
     try {
       return { ok: true, account: await verifyConnection(id) };
@@ -115,15 +125,16 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
     }
   });
 
-  app.delete("/api/connections/:id", async (request, reply) => {
+  app.delete("/api/connections/:id", canManage, async (request, reply) => {
     const { id } = idParams.parse(request.params);
-    const [deleted] = await db.delete(connections).where(eq(connections.id, id)).returning({ id: connections.id });
+    const [deleted] = await db.delete(connections).where(eq(connections.id, id)).returning({ connector: connections.connector });
     if (!deleted) return reply.status(404).send({ error: "Connection not found" });
+    await recordActivity(currentUser(request).name, `removed a ${humanizeConnector(deleted.connector)} connection`);
     return reply.status(204).send();
   });
 
   // Sends the person to the provider's sign-in page.
-  app.get("/api/connections/oauth/:connector/start", async (request, reply) => {
+  app.get("/api/connections/oauth/:connector/start", canManage, async (request, reply) => {
     const params = connectorParams.parse(request.params);
     const { name } = startQuery.parse(request.query);
     const connector = getConnector(params.connector);
@@ -184,5 +195,5 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
     }
   });
 
-  app.get("/api/connections/oauth/redirect-uri", async () => ({ redirectUri: oauthRedirectUri() }));
+  app.get("/api/connections/oauth/redirect-uri", canManage, async () => ({ redirectUri: oauthRedirectUri() }));
 }

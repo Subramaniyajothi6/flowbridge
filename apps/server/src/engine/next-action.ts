@@ -6,27 +6,39 @@ export type StepState = { status: StepStatus; output: unknown };
 export type NextAction =
   | { type: "run"; stepId: string }
   | { type: "skip"; stepId: string }
+  | { type: "wait" }
   | { type: "finish"; status: "succeeded" | "failed" };
 
 function isFinished(state: StepState | undefined): boolean {
-  return state !== undefined && state.status !== "running";
+  return state !== undefined && state.status !== "running" && state.status !== "waiting";
 }
 
 function isEdgeFollowed(edge: WorkflowEdge, source: StepState): boolean {
+  if (edge.when === "error") return source.status === "failed";
   if (source.status !== "succeeded") return false;
   if (edge.when === "success") return true;
+  if (edge.when === "approved" || edge.when === "rejected") return (source.output as { decision: string }).decision === edge.when;
   return String((source.output as { result: boolean }).result) === edge.when;
+}
+
+export function hasErrorPath(definition: WorkflowDefinition, stepId: string): boolean {
+  return definition.edges.some((edge) => edge.from === stepId && edge.when === "error");
 }
 
 // Looks at what has happened so far and decides the single next thing to do.
 // It only reads its inputs, so a run can always be picked up from the saved rows.
 export function findNextAction(definition: WorkflowDefinition, states: Map<string, StepState>): NextAction {
-  for (const state of states.values()) {
-    if (state.status === "failed") return { type: "finish", status: "failed" };
+  // A failed step stops the run, unless the workflow says what to do about it.
+  for (const [stepId, state] of states) {
+    if (state.status === "failed" && !hasErrorPath(definition, stepId)) return { type: "finish", status: "failed" };
   }
 
+  let isAnyStepWaiting = false;
+
   for (const step of definition.steps) {
-    if (isFinished(states.get(step.id))) continue;
+    const state = states.get(step.id);
+    if (state?.status === "waiting") isAnyStepWaiting = true;
+    if (state?.status === "waiting" || isFinished(state)) continue;
 
     const incoming = definition.edges.filter((edge) => edge.to === step.id);
     if (incoming.length === 0) return { type: "run", stepId: step.id };
@@ -38,5 +50,5 @@ export function findNextAction(definition: WorkflowDefinition, states: Map<strin
     return { type: anyEdgeFollowed ? "run" : "skip", stepId: step.id };
   }
 
-  return { type: "finish", status: "succeeded" };
+  return isAnyStepWaiting ? { type: "wait" } : { type: "finish", status: "succeeded" };
 }

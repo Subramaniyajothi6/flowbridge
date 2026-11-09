@@ -1,4 +1,4 @@
-import { and, asc, eq, lte, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, lte, sql } from "drizzle-orm";
 import { config } from "../config.ts";
 import { openConnection } from "../connections/client.ts";
 import { db } from "../db/client.ts";
@@ -17,7 +17,8 @@ export async function fireDueTriggers(): Promise<void> {
     .select({ trigger: triggers, versionId: workflows.currentVersionId })
     .from(triggers)
     .innerJoin(workflows, eq(triggers.workflowId, workflows.id))
-    .where(and(eq(triggers.enabled, true), lte(triggers.nextFireAt, sql`now()`)))
+    // A workflow that has not been published yet has nothing for a trigger to start.
+    .where(and(eq(triggers.enabled, true), lte(triggers.nextFireAt, sql`now()`), isNotNull(workflows.currentVersionId)))
     .orderBy(asc(triggers.nextFireAt))
     .limit(MAX_TRIGGERS_PER_TICK);
 

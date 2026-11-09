@@ -1,4 +1,4 @@
-import { GitFork, Globe, MousePointerClick } from "lucide-react";
+import { GitFork, Globe, Hourglass, MousePointerClick, Repeat, UserCheck } from "lucide-react";
 import logos from "../assets/logos.json";
 import type { WorkflowStep } from "../types.ts";
 
@@ -37,7 +37,43 @@ export function IfIcon() {
   );
 }
 
+export function DelayIcon() {
+  return (
+    <span className="step-icon n-ic logic">
+      <Hourglass size={15} aria-hidden="true" />
+    </span>
+  );
+}
+
+export function ApprovalIcon() {
+  return (
+    <span className="step-icon n-ic logic">
+      <UserCheck size={15} aria-hidden="true" />
+    </span>
+  );
+}
+
+export function LoopIcon() {
+  return (
+    <span className="step-icon n-ic logic">
+      <Repeat size={15} aria-hidden="true" />
+    </span>
+  );
+}
+
 export function StepIcon({ step }: { step: WorkflowStep }) {
-  if (step.type === "connector") return <ServiceLogo connector={step.config.connector} />;
-  return step.type === "if" ? <IfIcon /> : <HttpIcon />;
+  switch (step.type) {
+    case "connector":
+      return <ServiceLogo connector={step.config.connector} />;
+    case "if":
+      return <IfIcon />;
+    case "delay":
+      return <DelayIcon />;
+    case "approval":
+      return <ApprovalIcon />;
+    case "loop":
+      return <LoopIcon />;
+    default:
+      return <HttpIcon />;
+  }
 }

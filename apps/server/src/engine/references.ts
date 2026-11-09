@@ -4,6 +4,8 @@
 export type ReferenceContext = {
   trigger: unknown;
   steps: Record<string, { output: unknown }>;
+  // Only present while a Loop step is working on one item.
+  loop?: { item: unknown; index: number };
 };
 
 export class MissingReferenceError extends Error {}

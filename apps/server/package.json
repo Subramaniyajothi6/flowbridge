@@ -9,7 +9,8 @@
     "crash-test": "tsx scripts/crash-test.ts",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx scripts/seed-users.ts"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.2",

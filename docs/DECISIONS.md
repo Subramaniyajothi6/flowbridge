@@ -42,6 +42,11 @@ Dates are in YYYY-MM-DD format.
 | 3.6 | Run available workflows: all four roles. | Running processes is the Business User's whole purpose. |
 | 3.7 | Technical Operator sees the Builder read-only. Business User has no Builder, Templates or Integrations. | Each role only sees what it needs. |
 | 3.8 | The permissions matrix lives in the documentation and report, not in the admin screen. | It is reference material, not something an administrator edits. |
+| 3.9 | One workspace per installation. Only the first person can register, and Administrators add everyone else (2026-11-10). | Open registration on a public site would let a stranger reach the workspace's connected accounts. |
+| 3.10 | Passwords use Node's built-in scrypt. Sessions are random tokens in an HttpOnly cookie, stored only as hashes (2026-11-10). | No extra packages, and a leaked database cannot be used to sign in. |
+| 3.11 | New members get a one-time temporary password from their Administrator (2026-11-10). | There is no free email service in the project. |
+| 3.12 | Approvals can be decided by Administrators, Workflow Creators and Business Users (2026-11-10). | Business Users use the automations and are the likely approvers. Technical Operators investigate faults instead. |
+| 3.13 | The real Sign in page does not list test accounts (2026-11-10). | The prototype listed them for reviewers, but a real sign-in page must not show a password. |
 
 ## 4. Design
 
@@ -100,6 +105,12 @@ Dates are in YYYY-MM-DD format.
 | 6.10 | A worker carries a run from step to step inside one job, for up to half of the job's time limit, then queues the rest (2026-11-09). | Removes the wait between steps. A crash still only loses the step in progress, because progress is saved after every step. |
 | 6.11 | The database wakes workers through PostgreSQL notifications, with a slower check as a backstop (2026-11-09). | A new run starts straight away, and this also works if the API and worker are ever run separately. |
 | 6.12 | A worker handles 3 runs at once. A lease must always be longer than the longest step (2026-11-09). | One slow workflow should not hold up the others. If a lease ran out during a step, another worker would correctly take the run over and repeat that step. |
+| 6.13 | Delays, approvals and retry waits are all a step saved as waiting with a time to resume, checked every 20 seconds (2026-11-10). | Completes 2.9. A wait is a database row, so it survives restarts and the free host sleeping. |
+| 6.14 | Any step can have an error path. A failure that is handled lets the run succeed. Replaces 6.6 (2026-11-10). | A workflow should be able to say what to do about a failure, and a handled failure is not a failed process. |
+| 6.15 | Retries wait longer each time, up to 5 attempts, and a missing value is never retried (2026-11-10). | Retrying straight away rarely helps a struggling service. A missing value will still be missing next time. |
+| 6.16 | A retry is always a new run. Retry from failed step copies the successful steps (2026-11-10). | The original stays as the record of what happened, and customers are not created twice. |
+| 6.17 | Retries use the published version (2026-11-10). | Otherwise fixing a step and retrying would repeat the same mistake. A retried run keeps its own version, so its history stays accurate. |
+| 6.18 | A loop repeats one action for up to 100 items, one item per turn of the engine, with progress saved after each (2026-11-10). | Follows 2.7. A lease only ever covers one call, and a crash only repeats one item. |
 
 ## 7. Repository
 
@@ -167,3 +178,10 @@ Dates are in YYYY-MM-DD format.
 | 10.11 | Workflows may start empty (2026-11-09). | Replaces the rule that a workflow needs at least one step, so one can be built on the canvas. A run still needs a step. |
 | 10.12 | Table header corners are rounded on the cells themselves (2026-11-09). | Completes 4.13 without clipping row menus. |
 | 10.13 | The builder shows a message on phones instead of a squeezed canvas (2026-11-09). | A node canvas cannot be used at phone width. |
+| 10.14 | Saving keeps a private draft. Publishing creates a numbered version. Replaces 10.5 (2026-11-10). | Editing must not change what is live until someone decides it should. |
+| 10.15 | A test run really runs, using a private copy of the draft, and is left out of statistics and usage (2026-11-10). | A test only proves something if it is real, and testing must not skew the numbers. |
+| 10.16 | The monthly run limit counts live runs and can be changed by an Administrator (2026-11-10). | Protects the free database. |
+| 10.17 | The public Home page is the approved prototype page served as static files, with its links changed and the demo password removed (2026-11-10). | It is large and interactive and was approved as it is, so rewriting it could only introduce differences. Follows 10.2. |
+| 10.18 | The server looks for built files on each request (2026-11-10). | It previously listed them at start-up, so a rebuild showed a blank page until a restart. |
+| 10.19 | Run pages show a compact straight-line path instead of the canvas (2026-11-10). | This is the approved replay design. A branch that was not taken shows as not run. |
+| 10.20 | Features in the prototype with nothing real behind them were left out: global search, notification settings and the replay slider (2026-11-10). | A control that does nothing is worse than no control. |

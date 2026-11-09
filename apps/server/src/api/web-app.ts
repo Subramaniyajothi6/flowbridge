@@ -13,7 +13,9 @@ export function registerWebApp(app: FastifyInstance): void {
     return;
   }
 
-  app.register(fastifyStatic, { root: WEB_BUILD, wildcard: false });
+  // The public Home page is its own file, so the address "/" must not serve the React app.
+  app.register(fastifyStatic, { root: WEB_BUILD, index: false });
+  app.get("/", (_request, reply) => reply.sendFile("home.html"));
 
   // Addresses like /workflows/123 only exist inside the React app.
   app.setNotFoundHandler((request, reply) => {

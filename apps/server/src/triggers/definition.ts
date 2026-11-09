@@ -2,6 +2,7 @@ import { CronExpressionParser } from "cron-parser";
 import { z } from "zod";
 
 const MINIMUM_POLL_SECONDS = 60;
+const SECRET_HEADER = /authorization|cookie|token|secret|api-?key/i;
 
 export const scheduleConfigSchema = z
   .object({
@@ -23,7 +24,16 @@ export const scheduleConfigSchema = z
 
 export const pollConfigSchema = z.object({
   url: z.url(),
-  headers: z.record(z.string(), z.string()).default({}),
+  // Set this to check a service that needs signing in.
+  connectionId: z.uuid().optional(),
+  // Secrets belong in a connection, where they are encrypted.
+  headers: z
+    .record(z.string(), z.string())
+    .default({})
+    .refine(
+      (headers) => !Object.keys(headers).some((name) => SECRET_HEADER.test(name)),
+      "Use a connection for credentials, not a header",
+    ),
   // Where the list sits in the response, such as "data.orders". Empty means the response is the list.
   itemsPath: z.string().default(""),
   // The field that identifies an item, such as "id".

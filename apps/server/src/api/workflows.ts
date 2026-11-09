@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { desc, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { encryptSecret } from "../connections/secrets.ts";
 import { db } from "../db/client.ts";
 import { workflows, workflowVersions } from "../db/schema.ts";
 import { createRun } from "../engine/create-run.ts";
@@ -35,7 +36,11 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
   app.post("/api/workflows/:id/webhook-secret", async (request, reply) => {
     const { id } = idParams.parse(request.params);
     const webhookSecret = randomBytes(32).toString("hex");
-    const [updated] = await db.update(workflows).set({ webhookSecret }).where(eq(workflows.id, id)).returning();
+    const [updated] = await db
+      .update(workflows)
+      .set({ webhookSecret: encryptSecret(webhookSecret) })
+      .where(eq(workflows.id, id))
+      .returning();
     if (!updated) return reply.status(404).send({ error: "Workflow not found" });
     return reply.status(201).send({ webhookSecret });
   });

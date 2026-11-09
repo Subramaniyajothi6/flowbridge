@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { config } from "../config.ts";
+import { decryptSecret } from "../connections/secrets.ts";
 import { db } from "../db/client.ts";
 import { workflows } from "../db/schema.ts";
 import { createRun } from "../engine/create-run.ts";
@@ -41,7 +42,7 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
 
     if (workflow.webhookSecret) {
       const signature = request.headers[SIGNATURE_HEADER];
-      if (!isSignatureValid(rawBody ?? Buffer.alloc(0), workflow.webhookSecret, signature)) {
+      if (!isSignatureValid(rawBody ?? Buffer.alloc(0), decryptSecret(workflow.webhookSecret), signature)) {
         return reply.status(401).send({ error: "The signature is missing or wrong" });
       }
     }

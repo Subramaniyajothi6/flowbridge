@@ -1,5 +1,6 @@
 import { and, asc, eq, lte, sql } from "drizzle-orm";
 import { config } from "../config.ts";
+import { openConnection } from "../connections/client.ts";
 import { db } from "../db/client.ts";
 import { triggers, workflows } from "../db/schema.ts";
 import { createRun } from "../engine/create-run.ts";
@@ -54,11 +55,8 @@ async function fireSchedule(trigger: Trigger, versionId: string): Promise<void> 
 async function firePoll(trigger: Trigger, versionId: string): Promise<void> {
   const pollConfig = trigger.config as PollConfig;
 
-  const response = await runHttpStep(
-    { method: "GET", url: pollConfig.url, headers: pollConfig.headers },
-    { allowPrivateUrls: config.ALLOW_PRIVATE_URLS, idempotencyKey: "" },
-  );
-  const items = extractItems(response.body, pollConfig.itemsPath);
+  const body = await fetchPollBody(pollConfig);
+  const items = extractItems(body, pollConfig.itemsPath);
   const plan = planPoll(items, pollConfig.itemIdField, trigger.cursor);
 
   for (const { id, item } of plan.newItems) {
@@ -72,6 +70,19 @@ async function firePoll(trigger: Trigger, versionId: string): Promise<void> {
   }
 
   await markFired(trigger.id, nextPollTime(pollConfig, new Date()), plan.nextCursor);
+}
+
+async function fetchPollBody(pollConfig: PollConfig): Promise<unknown> {
+  if (pollConfig.connectionId) {
+    const { request } = await openConnection(pollConfig.connectionId);
+    return request(pollConfig.url, { headers: pollConfig.headers });
+  }
+
+  const response = await runHttpStep(
+    { method: "GET", url: pollConfig.url, headers: pollConfig.headers },
+    { allowPrivateUrls: config.ALLOW_PRIVATE_URLS, idempotencyKey: "" },
+  );
+  return response.body;
 }
 
 async function markFired(triggerId: string, nextFireAt: Date, cursor?: PollCursor): Promise<void> {

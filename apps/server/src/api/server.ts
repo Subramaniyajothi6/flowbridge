@@ -2,13 +2,26 @@ import Fastify from "fastify";
 import { sql } from "drizzle-orm";
 import { ZodError } from "zod";
 import { db } from "../db/client.ts";
+import { registerConnectPage } from "./connect-page.ts";
+import { registerConnectionRoutes } from "./connections.ts";
 import { registerRunRoutes } from "./runs.ts";
 import { registerTriggerRoutes } from "./triggers.ts";
 import { webhookRoutes } from "./webhooks.ts";
 import { registerWorkflowRoutes } from "./workflows.ts";
 
 export function buildServer() {
-  const app = Fastify({ logger: { level: "info" } });
+  const app = Fastify({
+    logger: {
+      level: "info",
+      serializers: {
+        // Addresses can carry secrets: sign-in codes in the query, and tokens in webhook paths.
+        req: (request) => ({
+          method: request.method,
+          url: (request.url ?? "").split("?")[0].replace(/^\/hooks\/.*/, "/hooks/[hidden]"),
+        }),
+      },
+    },
+  });
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ZodError) {
@@ -30,6 +43,8 @@ export function buildServer() {
   registerWorkflowRoutes(app);
   registerRunRoutes(app);
   registerTriggerRoutes(app);
+  registerConnectionRoutes(app);
+  registerConnectPage(app);
   app.register(webhookRoutes);
   return app;
 }

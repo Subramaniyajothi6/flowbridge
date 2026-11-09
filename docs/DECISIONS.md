@@ -124,5 +124,28 @@ Dates are in YYYY-MM-DD format.
 | 8.10 | Webhooks can require an HMAC-SHA256 signature, calculated on the exact bytes received (2026-11-09). | Anyone who learns a webhook address could otherwise send fake events. |
 | 8.11 | Webhooks accept JSON, form and plain text up to 256 KB, and at most 120 deliveries per workflow per minute. Headers holding secrets are not saved (2026-11-09). | Real services send different formats, a small free server needs limits, and run details are shown to users. |
 | 8.12 | Common delivery ID headers are recognised, including `Idempotency-Key`, `webhook-id` and `X-GitHub-Delivery` (2026-11-09). | Repeated deliveries are ignored without any setup for those senders. |
-| 8.13 | Webhook secrets and poll headers are stored as plain values for now (2026-11-09). | Encrypted storage is built in the connections stage, and they will move to it then. Until then, poll headers should not hold real keys. |
+| 8.13 | ~~Webhook secrets and poll headers are stored as plain values for now.~~ Replaced by 9.3 and 9.4. | It was a temporary step until encrypted storage existed. |
 | 8.14 | Use `cron-parser` and `@fastify/rate-limit` (2026-11-09). | Both are small, free and widely used, and correct cron and timezone handling is easy to get wrong by hand. |
+
+## 9. Connections and integrations
+
+| # | Decision | Why |
+|---|----------|-----|
+| 9.1 | First integrations: Slack, Google Sheets, Gmail and Stripe in test mode (2026-11-09). | They are free to use, and together cover messaging, data, email and payments. |
+| 9.2 | Credentials are encrypted with AES-256-GCM, and each stored value records its key ID (2026-11-09). | GCM also detects tampering, and the key ID lets keys be changed without losing existing connections. |
+| 9.3 | Webhook secrets are encrypted the same way (2026-11-09). | They need the same protection as other credentials. |
+| 9.4 | Poll triggers refuse credential headers, and use a saved connection instead (2026-11-09). | Secrets should live in one encrypted place. |
+| 9.5 | A workflow refers to a connection by ID only (2026-11-09). | Workflow definitions, versions and exports never contain a secret. |
+| 9.6 | Connector code receives a request function, and never the credential (2026-11-09). | Connector code cannot leak what it never sees. |
+| 9.7 | Each connector lists the hosts its credentials may be sent to (2026-11-09). | A mistake or a crafted address cannot send a credential to another site. |
+| 9.8 | Token refresh locks the connection row, then reads it again before refreshing (2026-11-09). | Several steps can notice an expired token at once. Only one should refresh, and the rest use its result. |
+| 9.9 | When Google withdraws access, the connection is marked as needing reconnection (2026-11-09). | The person gets a clear instruction, and repeated failing calls are avoided. |
+| 9.10 | Google uses OAuth 2.0. Slack uses a bot token (2026-11-09). | Slack requires an HTTPS redirect address, which a local machine does not have. A bot token also needs far less setup. |
+| 9.11 | Only Stripe test keys are accepted (2026-11-09). | A demonstration workflow can then never move real money. |
+| 9.12 | Stripe steps send the run and step ID as Stripe's idempotency key (2026-11-09). | A step repeated after a crash returns the original result instead of creating a second payment. |
+| 9.13 | Slack, Gmail and Sheets have no repeat protection, so a crash during those steps can repeat them (2026-11-09). | The services offer no idempotency key. It is rare, and the alternative is losing the action. |
+| 9.14 | Google's "Testing" status is accepted, and its connections are reconnected after 7 days (2026-11-09). | Publishing would need Google's verification for Gmail access, which does not suit an internship project. |
+| 9.15 | Values in fields named like secrets are replaced with `[hidden]` before step data is saved (2026-11-09). | Run details are shown to users. A later step cannot read a field hidden this way, which is an accepted limit. |
+| 9.16 | Server logs leave out query strings and webhook tokens (2026-11-09). | Addresses can carry sign-in codes and secret tokens. |
+| 9.17 | Credentials are tested when they are added, and are not kept if they fail (2026-11-09). | Mistakes appear immediately rather than during a run. |
+| 9.18 | A simple `/connect` page is used to add connections for now (2026-11-09). | Secrets need somewhere to be entered before the real interface exists, as planned in 2.3. It must not be public until sign-in is built. |

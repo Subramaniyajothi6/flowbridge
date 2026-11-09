@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { config } from "../config.ts";
+import { censorSecrets } from "../connections/censor.ts";
 import { db } from "../db/client.ts";
 import { runs, stepRuns, workflowVersions } from "../db/schema.ts";
 import type { WorkflowStep } from "./definition.ts";
@@ -110,13 +111,13 @@ async function executeStep(
 
   try {
     const input = resolveStepInput(step, context);
-    await saveStep(run.id, step.id, { status: "running", attempt, startedAt, input, error: null });
+    await saveStep(run.id, step.id, { status: "running", attempt, startedAt, input: censorSecrets(input), error: null });
     const output = await runStep(step, input, {
       allowPrivateUrls: config.ALLOW_PRIVATE_URLS,
       // Stays the same across attempts, so a repeat is recognisable.
       idempotencyKey: `${run.id}:${step.id}`,
     });
-    await saveStep(run.id, step.id, { status: "succeeded", output: output ?? null, finishedAt: new Date() });
+    await saveStep(run.id, step.id, { status: "succeeded", output: censorSecrets(output) ?? null, finishedAt: new Date() });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await saveStep(run.id, step.id, { status: "failed", attempt, startedAt, error: message, finishedAt: new Date() });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getAction } from "../connectors/registry.ts";
 
 // Step IDs appear inside references like {{steps.get_user.output.id}},
 // so they can only contain letters, numbers and underscores.
@@ -18,9 +19,18 @@ const ifConfig = z.object({
   right: z.unknown().optional(),
 });
 
+// Refers to a saved connection by its ID, so a workflow never contains a secret.
+const connectorConfig = z.object({
+  connector: z.string().min(1),
+  action: z.string().min(1),
+  connectionId: z.uuid(),
+  params: z.record(z.string(), z.unknown()).default({}),
+});
+
 const stepSchema = z.discriminatedUnion("type", [
   z.object({ id: stepId, name: z.string().min(1), type: z.literal("http_request"), config: httpRequestConfig }),
   z.object({ id: stepId, name: z.string().min(1), type: z.literal("if"), config: ifConfig }),
+  z.object({ id: stepId, name: z.string().min(1), type: z.literal("connector"), config: connectorConfig }),
 ]);
 
 // An edge says: after step "from", go to step "to".
@@ -47,6 +57,7 @@ export type WorkflowStep = WorkflowDefinition["steps"][number];
 export type WorkflowEdge = WorkflowDefinition["edges"][number];
 export type HttpRequestConfig = z.infer<typeof httpRequestConfig>;
 export type IfConfig = z.infer<typeof ifConfig>;
+export type ConnectorStepConfig = z.infer<typeof connectorConfig>;
 
 function findGraphProblems(definition: WorkflowDefinition): string[] {
   const problems: string[] = [];
@@ -55,6 +66,10 @@ function findGraphProblems(definition: WorkflowDefinition): string[] {
   for (const step of definition.steps) {
     if (stepsById.has(step.id)) problems.push(`Step id "${step.id}" is used more than once`);
     stepsById.set(step.id, step);
+
+    if (step.type === "connector" && !getAction(step.config.connector, step.config.action)) {
+      problems.push(`Step "${step.id}" uses unknown action "${step.config.connector}.${step.config.action}"`);
+    }
   }
 
   for (const edge of definition.edges) {

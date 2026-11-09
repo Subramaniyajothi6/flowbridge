@@ -50,6 +50,27 @@ export const triggers = pgTable(
   (table) => [index().on(table.enabled, table.nextFireAt)],
 );
 
+export const connections = pgTable("connections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  connector: text("connector").notNull(),
+  name: text("name").notNull(),
+  // The account it belongs to, shown to people so they can tell connections apart.
+  account: text("account"),
+  // Always encrypted. See connections/crypto.ts.
+  encryptedCredentials: text("encrypted_credentials").notNull(),
+  status: text("status").$type<"active" | "needs_reconnect">().notNull().default("active"),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Sign-ins that have started but not finished.
+export const oauthStates = pgTable("oauth_states", {
+  state: text("state").primaryKey(),
+  connector: text("connector").notNull(),
+  name: text("name").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
 export type RunStatus = "queued" | "running" | "succeeded" | "failed";
 export type RunTriggerType = "manual" | "webhook" | "schedule" | "poll";
 

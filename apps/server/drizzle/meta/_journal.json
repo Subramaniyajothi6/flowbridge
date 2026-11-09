@@ -15,6 +15,13 @@
       "when": 1794170987553,
       "tag": "0001_tranquil_black_cat",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794230665475,
+      "tag": "0002_absurd_rachel_grey",
+      "breakpoints": true
     }
   ]
 }

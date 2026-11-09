@@ -66,7 +66,7 @@ function buildBody(config: HttpRequestConfig, headers: Headers): string | undefi
   return JSON.stringify(config.body);
 }
 
-async function readLimitedText(response: Response): Promise<string> {
+export async function readLimitedText(response: Response): Promise<string> {
   if (!response.body) return "";
   const chunks: Buffer[] = [];
   let totalBytes = 0;
@@ -79,7 +79,7 @@ async function readLimitedText(response: Response): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function parseBody(text: string, contentType: string | null): unknown {
+export function parseBody(text: string, contentType: string | null): unknown {
   if (!contentType?.includes("json")) return text;
   try {
     return JSON.parse(text);

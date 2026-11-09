@@ -1,4 +1,5 @@
-import type { HttpRequestConfig, IfConfig, WorkflowStep } from "../definition.ts";
+import { runConnectorStep } from "../../connections/run-connector.ts";
+import type { ConnectorStepConfig, HttpRequestConfig, IfConfig, WorkflowStep } from "../definition.ts";
 import { resolveReferences, type ReferenceContext } from "../references.ts";
 import { runHttpStep, type HttpStepOptions } from "./http-step.ts";
 import { runIfStep } from "./if-step.ts";
@@ -16,5 +17,7 @@ export async function runStep(step: WorkflowStep, input: unknown, options: HttpS
       return runHttpStep(input as HttpRequestConfig, options);
     case "if":
       return runIfStep(input as IfConfig);
+    case "connector":
+      return runConnectorStep(input as ConnectorStepConfig, options.idempotencyKey);
   }
 }

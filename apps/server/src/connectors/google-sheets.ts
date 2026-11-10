@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { GOOGLE_IDENTITY_HOST, GOOGLE_IDENTITY_SCOPES, testGoogleConnection } from "./google-shared.ts";
-import { defineAction, type Connector } from "./types.ts";
+import { defineAction, type Connector, type ConnectorRequest } from "./types.ts";
 
 const API = "https://sheets.googleapis.com/v4/spreadsheets";
 
@@ -9,6 +9,20 @@ const range = z.string().min(1).default("Sheet1");
 
 function valuesUrl(id: string, sheetRange: string): string {
   return `${API}/${id}/values/${encodeURIComponent(sheetRange)}`;
+}
+
+// A tab of values with no headings means nothing to the person reading it.
+// Only an empty first row is filled in, so existing data and headings are never changed.
+async function addHeadingsIfMissing(request: ConnectorRequest, id: string, sheetRange: string, headings: string[]) {
+  const firstRow = valuesUrl(id, `${sheetRange.split("!")[0]}!1:1`);
+  const existing = await request(firstRow);
+  if (existing.values?.length) return;
+
+  await request(`${firstRow}?valueInputOption=RAW`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ values: [headings] }),
+  });
 }
 
 function toCell(value: unknown): unknown {
@@ -29,8 +43,15 @@ export const googleSheets: Connector = {
   actions: {
     append_row: defineAction({
       description: "Add a row to the end of a sheet",
-      input: z.object({ spreadsheetId, range, values: z.array(z.unknown()).min(1) }),
+      input: z.object({
+        spreadsheetId,
+        range,
+        values: z.array(z.unknown()).min(1),
+        headings: z.array(z.coerce.string()).optional(),
+      }),
       async run({ request }, input) {
+        if (input.headings?.length) await addHeadingsIfMissing(request, input.spreadsheetId, input.range, input.headings);
+
         const response = await request(`${valuesUrl(input.spreadsheetId, input.range)}:append?valueInputOption=USER_ENTERED`, {
           method: "POST",
           headers: { "content-type": "application/json" },

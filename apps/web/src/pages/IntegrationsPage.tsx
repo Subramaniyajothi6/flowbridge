@@ -48,9 +48,11 @@ export function IntegrationsPage() {
 
         {!openConnector && notice}
         {connectors.error && <div className="notice err">{connectors.error}</div>}
+        {connections.error && <div className="notice err">{connections.error}</div>}
 
         <div className="g-auto">
-          {connectors.data?.map((connector) => (
+          {/* Waits for both lists, so a connected service never shows Connect for a moment. */}
+          {connections.data && connectors.data?.map((connector) => (
             <ConnectorCard
               key={connector.id}
               connector={connector}

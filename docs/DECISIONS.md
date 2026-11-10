@@ -160,6 +160,7 @@ Dates are in YYYY-MM-DD format.
 | 9.16 | Server logs leave out query strings and webhook tokens (2026-11-09). | Addresses can carry sign-in codes and secret tokens. |
 | 9.17 | Credentials are tested when they are added, and are not kept if they fail (2026-11-09). | Mistakes appear immediately rather than during a run. |
 | 9.18 | ~~A simple `/connect` page is used to add connections for now.~~ Replaced by 10.8. | It was only needed until the real interface existed. |
+| 9.19 | The Sheets "Add row" action can write column headings, but only when the first row is empty (2026-11-10). | Rows without headings mean nothing to the reader, and existing data must never be overwritten. |
 
 ## 10. Visual builder and screens
 
@@ -185,3 +186,5 @@ Dates are in YYYY-MM-DD format.
 | 10.18 | The server looks for built files on each request (2026-11-10). | It previously listed them at start-up, so a rebuild showed a blank page until a restart. |
 | 10.19 | Run pages show a compact straight-line path instead of the canvas (2026-11-10). | This is the approved replay design. A branch that was not taken shows as not run. |
 | 10.20 | Features in the prototype with nothing real behind them were left out: global search, notification settings and the replay slider (2026-11-10). | A control that does nothing is worse than no control. |
+| 10.21 | The Workflows list shows the latest test run, labelled "Test only", when a workflow has no live run (2026-11-10). | "Never run" was wrong for a workflow that had been tested. Test runs still stay out of statistics, following 10.15. |
+| 10.22 | Integrations cards appear only after both the services and the connections have loaded (2026-11-10). | Otherwise a connected service briefly shows the orange Connect button. |

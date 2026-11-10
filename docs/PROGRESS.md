@@ -8,6 +8,14 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Log (newest first)
 
+### 2026-11-10, laptop, manual check
+- Pulled the stage 5 to 7 work and started checking the whole app by hand.
+- Proved the "Welcome new customers" template in a test run with real accounts: rows added to Sheets, email sent, Slack message posted.
+- Google Sheets "Add row" can now write column headings when the first row of a tab is empty. The templates use this.
+- Integrations cards now wait for both lists, so a connected service no longer shows an orange Connect button for a moment.
+- The Workflows list now shows the result of a test run with a "Test only" label, instead of "Never run".
+- 109 automated checks and the type check pass. The Workflows label has not yet been seen on screen after a server restart.
+
 ### 2026-11-10, laptop
 - Reviewed the stage 4 screens against the prototype and fixed the differences on Integrations, the run page and the builder.
 - Built stage 5: delay, approval, loop, retries with increasing waits, error paths, retry from failed step and run from start.
@@ -37,10 +45,12 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Next
 
-1. Deploy on Render, following the Deployment section of `README.md`.
-2. Before sharing the address, change the demo password by running the seed command with a new `SEED_PASSWORD`.
-3. Test the "Welcome new customers" template with real accounts. It needs a spreadsheet with Customers and Tasks tabs.
-4. Add the deployment link to the README and the final demonstration notes.
+1. Finish the manual check: Integrations Test buttons, build, publish and run, failure and retry, approval, and signing in as each role.
+2. Deploy on Render, following the Deployment section of `README.md`.
+3. Before sharing the address, change the demo password by running the seed command with a new `SEED_PASSWORD`.
+4. Add the public address to the Google OAuth redirect addresses, then reconnect Gmail and Sheets on the live site.
+5. Copy `reports` and `research_notes` into `docs`, and make the repository public or share access.
+6. Add the deployment link to the README and the final demonstration notes, then rehearse the demonstration.
 
 ## Setting up a new machine
 
@@ -111,5 +121,6 @@ Outside this repository, in the laptop's `D:\Adz4\FlowBridge Project` folder:
 - Stripe is a sandbox registered as a United States account only because Stripe is invitation-only in India. Keep it in test mode and never activate it.
 - The Render free host sleeps after 15 minutes idle. Open the site a few minutes before a demonstration.
 - Demo accounts: jonah@ (Administrator), priya@ (Workflow Creator), rahul@ (Technical Operator), lena@ (Business User), all at meridianlogistics.example.
-- A draft workflow "Welcome new customers" is in the workspace, made from the template, ready for its spreadsheet ID.
+- The workflow "Welcome new customers" is in the workspace and has passed a test run. It uses a spreadsheet with Customers and Tasks tabs.
+- If `npm start` fails with `getaddrinfo ENOTFOUND` for the Neon address, the network's DNS is refusing it. Setting the Wi-Fi DNS to 8.8.8.8 and 8.8.4.4 fixed it on the laptop.
 - To test a workflow that uses webhook data, enter test data as `{ "body": { "name": "Asha", "email": "you@example.com", "company": "Acme" } }`.

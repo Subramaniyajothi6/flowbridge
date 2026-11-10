@@ -20,7 +20,7 @@ function connector(id: string, name: string, service: string, action: string, pa
 
 const slack = (id: string, name: string, text: string) => connector(id, name, "slack", "send_message", { channel: "#all-flowbridge-demo", text }, RETRY);
 const email = (id: string, name: string, to: string, subject: string, body: string) => connector(id, name, "gmail", "send_email", { to, subject, body }, RETRY);
-const addRow = (id: string, name: string, range: string, values: string[]) => connector(id, name, "google_sheets", "append_row", { spreadsheetId: "", range, values }, RETRY);
+const addRow = (id: string, name: string, range: string, values: string[], headings: string[]) => connector(id, name, "google_sheets", "append_row", { spreadsheetId: "", range, values, headings }, RETRY);
 
 export const templates: Template[] = [
   {
@@ -32,10 +32,10 @@ export const templates: Template[] = [
     definition: {
       steps: [
         { id: "validate", name: "Validate customer", type: "if", config: { left: "{{trigger.body.email}}", operator: "exists" } },
-        addRow("save_customer", "Save customer", "Customers", ["{{trigger.body.name}}", "{{trigger.body.email}}", "{{trigger.body.company}}"]),
+        addRow("save_customer", "Save customer", "Customers", ["{{trigger.body.name}}", "{{trigger.body.email}}", "{{trigger.body.company}}"], ["Name", "Email", "Company"]),
         email("welcome_email", "Send welcome email", "{{trigger.body.email}}", "Welcome to Meridian Logistics", "Hi {{trigger.body.name}},\n\nThanks for registering. We will be in touch shortly."),
         slack("notify_sales", "Notify sales team", "New customer: {{trigger.body.name}} from {{trigger.body.company}}"),
-        addRow("follow_up", "Create follow-up task", "Tasks", ["Call {{trigger.body.name}}", "{{trigger.body.email}}", "Open"]),
+        addRow("follow_up", "Create follow-up task", "Tasks", ["Call {{trigger.body.name}}", "{{trigger.body.email}}", "Open"], ["Task", "Email", "Status"]),
         slack("flag_invalid", "Flag invalid registration", "A registration arrived with no email address."),
       ],
       edges: [
@@ -69,7 +69,7 @@ export const templates: Template[] = [
     stepLabels: ["Save", "Email"],
     definition: {
       steps: [
-        addRow("record_invoice", "Record invoice", "Invoices", ["{{trigger.body.invoice}}", "{{trigger.body.amount}}", "{{trigger.body.email}}"]),
+        addRow("record_invoice", "Record invoice", "Invoices", ["{{trigger.body.invoice}}", "{{trigger.body.amount}}", "{{trigger.body.email}}"], ["Invoice", "Amount", "Email"]),
         email("send_receipt", "Send receipt", "{{trigger.body.email}}", "Your receipt", "Thank you. We received your payment of {{trigger.body.amount}}."),
       ],
       edges: [{ from: "record_invoice", to: "send_receipt", when: "success" }],
@@ -103,7 +103,7 @@ export const templates: Template[] = [
       steps: [
         { id: "is_urgent", name: "Is it urgent?", type: "if", config: { left: "{{trigger.body.priority}}", operator: "equals", right: "urgent" } },
         slack("alert_on_call", "Alert on-call", "Urgent ticket: {{trigger.body.subject}}"),
-        addRow("log_ticket", "Log ticket", "Tickets", ["{{trigger.body.subject}}", "{{trigger.body.priority}}"]),
+        addRow("log_ticket", "Log ticket", "Tickets", ["{{trigger.body.subject}}", "{{trigger.body.priority}}"], ["Subject", "Priority"]),
       ],
       edges: [
         { from: "is_urgent", to: "alert_on_call", when: "true" },

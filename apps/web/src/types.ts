@@ -57,6 +57,7 @@ export type WorkflowSummary = Omit<Workflow, "webhookToken"> & {
   versionNumber: number | null;
   stepCount: number;
   lastRun: { status: RunStatus; createdAt: string } | null;
+  lastTestRun: { status: RunStatus; createdAt: string } | null;
   last30Days: { total: number; succeeded: number; failed: number };
 };
 

@@ -1,7 +1,7 @@
 import type { z } from "zod";
 
 export type RequestOptions = {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PUT";
   headers?: Record<string, string>;
   body?: string;
 };

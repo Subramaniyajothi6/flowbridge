@@ -54,11 +54,15 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
 
     const versionIds = rows.map((row) => row.currentVersionId).filter((id) => id !== null);
     const versions = versionIds.length > 0 ? await db.select().from(workflowVersions).where(inArray(workflowVersions.id, versionIds)) : [];
-    const latestRuns = await db
-      .selectDistinctOn([runs.workflowId], { workflowId: runs.workflowId, status: runs.status, createdAt: runs.createdAt })
-      .from(runs)
-      .where(eq(runs.mode, "live"))
-      .orderBy(runs.workflowId, desc(runs.createdAt));
+    const findLatestRuns = (mode: "live" | "test") =>
+      db
+        .selectDistinctOn([runs.workflowId], { workflowId: runs.workflowId, status: runs.status, createdAt: runs.createdAt })
+        .from(runs)
+        .where(eq(runs.mode, mode))
+        .orderBy(runs.workflowId, desc(runs.createdAt));
+    const latestRuns = await findLatestRuns("live");
+    // A workflow that has only been tested has still been run, so the list says so.
+    const latestTestRuns = await findLatestRuns("test");
 
     const usage = await db
       .select({
@@ -81,6 +85,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
         versionNumber: version?.versionNumber ?? null,
         stepCount: (draftDefinition ?? version?.definition)?.steps.length ?? 0,
         lastRun: latestRuns.find((item) => item.workflowId === row.id) ?? null,
+        lastTestRun: latestTestRuns.find((item) => item.workflowId === row.id) ?? null,
         last30Days: usage.find((item) => item.workflowId === row.id) ?? { total: 0, succeeded: 0, failed: 0 },
       };
     });

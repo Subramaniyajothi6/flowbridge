@@ -15,6 +15,18 @@ const statusFilters = [
   { value: "draft", label: "Draft" },
 ];
 
+// Live runs come first. A workflow that has only been tested says so, instead of "Never run".
+function LastRun({ workflow }: { workflow: WorkflowSummary }) {
+  if (workflow.lastRun) return <StatusBadge status={workflow.lastRun.status} />;
+  if (!workflow.lastTestRun) return <span className="dim">Never run</span>;
+  return (
+    <span className="row">
+      <StatusBadge status={workflow.lastTestRun.status} />
+      <span className="small dim">Test only</span>
+    </span>
+  );
+}
+
 function PublicationBadge({ workflow }: { workflow: WorkflowSummary }) {
   const labels: Record<PublicationStatus, { className: string; text: string }> = {
     draft: { className: "b-off", text: "Draft" },
@@ -82,7 +94,7 @@ export function WorkflowsPage() {
             <div className="tbl-wrap tbl-round">
               <table className="tbl">
                 <thead>
-                  <tr><th>Workflow</th><th>Status</th><th>Last run</th><th className="r hide-m">Success rate</th><th className="r hide-m">Runs, 30 days</th><th className="hide-m">Last updated</th><th><span className="sr-only">Actions</span></th></tr>
+                  <tr><th>Workflow</th><th>Status</th><th>Last run</th><th className="r hide-m">Success rate</th><th className="r hide-m">Live runs, 30 days</th><th className="hide-m">Last updated</th><th><span className="sr-only">Actions</span></th></tr>
                 </thead>
                 <tbody>
                   {visible.map((workflow) => (
@@ -92,7 +104,7 @@ export function WorkflowsPage() {
                         <div className="small muted">{workflow.stepCount} {workflow.stepCount === 1 ? "step" : "steps"}</div>
                       </td>
                       <td><PublicationBadge workflow={workflow} /></td>
-                      <td>{workflow.lastRun ? <StatusBadge status={workflow.lastRun.status} /> : <span className="dim">Never run</span>}</td>
+                      <td><LastRun workflow={workflow} /></td>
                       <td className="r num hide-m">{formatPercent(workflow.last30Days.succeeded, workflow.last30Days.succeeded + workflow.last30Days.failed)}</td>
                       <td className="r num hide-m">{formatNumber(workflow.last30Days.total)}</td>
                       <td className="muted hide-m">

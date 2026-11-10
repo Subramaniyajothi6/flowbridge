@@ -155,6 +155,29 @@ describe("Google Sheets", () => {
     assert.deepEqual(output, { updatedRange: "Sheet1!A2:B2", updatedRows: 1 });
   });
 
+  const headings = ["Name", "Email"];
+  const appended = { updates: { updatedRange: "Customers!A2:B2", updatedRows: 1 } };
+
+  it("writes the headings first when the tab is empty", async () => {
+    const { calls } = await runAction(googleSheets, "append_row", { spreadsheetId: "abc", range: "Customers", values: ["a", "b"], headings }, appended);
+    assert.equal(calls.length, 3);
+    assert.ok(calls[1].url.includes("/values/Customers!1%3A1") || calls[1].url.includes("/values/Customers%211%3A1"));
+    assert.equal(calls[1].options.method, "PUT");
+    assert.deepEqual(JSON.parse(calls[1].options.body as string), { values: [headings] });
+    assert.ok(calls[2].url.endsWith(":append?valueInputOption=USER_ENTERED"));
+  });
+
+  it("leaves a first row that already has content alone", async () => {
+    const { calls } = await runAction(googleSheets, "append_row", { spreadsheetId: "abc", range: "Customers", values: ["a"], headings }, { ...appended, values: [["Existing"]] });
+    assert.equal(calls.length, 2);
+    assert.equal(calls.some((call) => call.options.method === "PUT"), false);
+  });
+
+  it("does not look at the first row when no headings are given", async () => {
+    const { calls } = await runAction(googleSheets, "append_row", { spreadsheetId: "abc", range: "Customers", values: ["a"] }, appended);
+    assert.equal(calls.length, 1);
+  });
+
   it("encodes the range, and returns an empty list for an empty sheet", async () => {
     const { output, calls } = await runAction(googleSheets, "read_rows", { spreadsheetId: "abc", range: "My Sheet!A1:B2" }, { range: "x" });
     assert.ok(calls[0].url.endsWith("/values/My%20Sheet!A1%3AB2"));

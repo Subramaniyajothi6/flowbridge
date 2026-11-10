@@ -1,7 +1,7 @@
 import type { z } from "zod";
 
 export type RequestOptions = {
-  method?: "GET" | "POST" | "PUT";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   headers?: Record<string, string>;
   body?: string;
 };
@@ -43,6 +43,12 @@ export type Connector = {
   auth: ConnectorAuth;
   // Credentials are only ever sent to these hosts.
   allowedHosts: string[];
+  // How the credential is sent. Without this it is sent as a bearer token.
+  credentialHeaders?: (secret: string) => Record<string, string>;
+  // Runs before each call. Custom apps use it to refuse private network addresses.
+  checkBeforeSend?: (url: URL) => Promise<void>;
+  // Only set for an app added on the Integrations page.
+  customHost?: string;
   // Makes a harmless call to prove the connection works, and names the account.
   test: (context: ActionContext) => Promise<{ account: string }>;
   actions: Record<string, ConnectorAction>;

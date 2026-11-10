@@ -1,0 +1,1 @@
+ALTER TABLE "custom_apps" ADD COLUMN "logo" text;

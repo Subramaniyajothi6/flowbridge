@@ -3,9 +3,11 @@ import type {
   AuthStatus,
   Connection,
   ConnectorInfo,
+  CustomAppDraft,
   Definition,
   Health,
   Member,
+  Notifications,
   Overview,
   PublicationStatus,
   Role,
@@ -67,6 +69,8 @@ export const api = {
   updateWorkspace: (body: { name: string; monthlyRunLimit: number }) => request<Workspace>("/api/workspace", { method: "PATCH", body }),
 
   usage: () => request<Usage>("/api/monitoring/usage"),
+  notifications: () => request<Notifications>("/api/monitoring/notifications"),
+  markNotificationsRead: () => request<void>("/api/monitoring/notifications/read", { method: "POST", body: {} }),
   overview: () => request<Overview>("/api/monitoring/overview"),
   analytics: (days: number) => request<Analytics>(`/api/monitoring/analytics?days=${days}`),
   health: () => request<Health>("/api/monitoring/health"),
@@ -114,4 +118,9 @@ export const api = {
   testConnection: (id: string) =>
     request<{ ok: boolean; account?: string; error?: string }>(`/api/connections/${id}/test`, { method: "POST", body: {} }),
   deleteConnection: (id: string) => request<void>(`/api/connections/${id}`, { method: "DELETE" }),
+  addCustomApp: (app: CustomAppDraft & { logo?: string }) => request<{ id: string; hasLogo: boolean }>("/api/custom-apps", { method: "POST", body: app }),
+  listLogos: () => request<Record<string, string>>("/api/logos"),
+  setLogo: (connectorId: string, logo: string) => request<void>(`/api/logos/${connectorId}`, { method: "PUT", body: { logo } }),
+  resetLogo: (connectorId: string) => request<void>(`/api/logos/${connectorId}`, { method: "DELETE" }),
+  deleteCustomApp: (id: string) => request<void>(`/api/custom-apps/${id}`, { method: "DELETE" }),
 };

@@ -43,58 +43,57 @@ export function OverviewPage() {
               <Stat label="Success rate" value={formatPercent(data.runs.succeeded, data.runs.succeeded + data.runs.failed)} detail="Finished runs" />
             </section>
 
-            <div className="g-21">
-              <div className="col">
-                <AttentionCard items={data.attention} canRetry={can("runs.retry")} onChanged={reload} />
-                <section className="card">
-                  <div className="card-h"><h2 className="card-t">Recent executions</h2><Link className="small strong" to="/executions">View all</Link></div>
-                  {data.recent.length === 0 ? <p className="card-b muted">No live runs yet. Publish a workflow and run it.</p> : (
-                    <div className="tbl-wrap tbl-round">
-                      <table className="tbl">
-                        <thead><tr><th>Workflow</th><th>Status</th><th className="r hide-m">Started</th></tr></thead>
-                        <tbody>
-                          {data.recent.map((run) => (
-                            <tr key={run.id} className={run.status === "failed" ? "is-fail" : ""}>
-                              <td><Link className="link-row" to={`/executions/${run.id}`}>{run.workflow_name}</Link></td>
-                              <td><StatusBadge status={run.status} /></td>
-                              <td className="r muted hide-m">{formatDate(run.created_at)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </section>
-              </div>
+            {/* Two rows of two cards, so the cards side by side start and end level. */}
+            <div className="g-21 overview-rows">
+              <AttentionCard items={data.attention} canRetry={can("runs.retry")} onChanged={reload} />
 
-              <div className="col">
-                <section className="card">
-                  <div className="card-h"><h2 className="card-t">Most used workflows</h2></div>
-                  <div className="card-b col" style={{ gap: 8 }}>
-                    {data.mostUsed.length === 0 && <p className="muted">Nothing to show yet.</p>}
-                    {data.mostUsed.map((workflow) => (
-                      <div className="row between" key={workflow.id}>
-                        <span className="trunc">{workflow.name}</span>
-                        <span className="num small muted">{formatNumber(workflow.runs)}</span>
-                      </div>
-                    ))}
+              <section className="card">
+                <div className="card-h"><h2 className="card-t">Most used workflows</h2></div>
+                <div className="card-b col" style={{ gap: 8 }}>
+                  {data.mostUsed.length === 0 && <p className="muted">Nothing to show yet.</p>}
+                  {data.mostUsed.map((workflow) => (
+                    <div className="row between" key={workflow.id}>
+                      <span className="trunc">{workflow.name}</span>
+                      <span className="num small muted">{formatNumber(workflow.runs)}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* A role without System health gets the whole row, so no gap is left beside this. */}
+              <section className={`card ${can("system.view") ? "" : "overview-wide"}`}>
+                <div className="card-h"><h2 className="card-t">Recent executions</h2><Link className="small strong" to="/executions">View all</Link></div>
+                {data.recent.length === 0 ? <p className="card-b muted">No live runs yet. Publish a workflow and run it.</p> : (
+                  <div className="tbl-wrap tbl-round">
+                    <table className="tbl">
+                      <thead><tr><th>Workflow</th><th>Status</th><th className="r hide-m">Started</th></tr></thead>
+                      <tbody>
+                        {data.recent.map((run) => (
+                          <tr key={run.id} className={run.status === "failed" ? "is-fail" : ""}>
+                            <td><Link className="link-row" to={`/executions/${run.id}`}>{run.workflow_name}</Link></td>
+                            <td><StatusBadge status={run.status} /></td>
+                            <td className="r muted hide-m">{formatDate(run.created_at)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </section>
-                {can("system.view") && <HealthCard />}
-                <section className="card">
-                  <div className="card-h"><h2 className="card-t">Recent activity</h2></div>
-                  <div className="card-b col" style={{ gap: 10 }}>
-                    {data.activity.length === 0 && <p className="muted">Nothing to show yet.</p>}
-                    {data.activity.map((item) => (
-                      <div key={item.id}>
-                        <div>{item.actorName} {item.description}</div>
-                        <div className="small dim">{formatDate(item.createdAt)}</div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </div>
+                )}
+              </section>
+
+              {can("system.view") && <HealthCard />}
             </div>
+
+            <section className="card">
+              <div className="card-h"><h2 className="card-t">Recent activity</h2></div>
+              {data.activity.length === 0 && <p className="card-b muted">Nothing to show yet.</p>}
+              {data.activity.map((item) => (
+                <div className="activity-row" key={item.id}>
+                  <span>{item.actorName} {item.description}</span>
+                  <span className="small dim">{formatDate(item.createdAt)}</span>
+                </div>
+              ))}
+            </section>
           </>
         )}
       </div>

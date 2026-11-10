@@ -1,5 +1,6 @@
 import { buildServer } from "./api/server.ts";
 import { config } from "./config.ts";
+import { loadCustomApps } from "./connectors/custom-apps-store.ts";
 import { pool } from "./db/client.ts";
 import { boss, startQueue } from "./engine/queue.ts";
 import { startWorker } from "./engine/worker.ts";
@@ -8,6 +9,7 @@ const runsApi = config.RUN_MODE === "all" || config.RUN_MODE === "api";
 const runsWorker = config.RUN_MODE === "all" || config.RUN_MODE === "worker";
 
 await startQueue();
+await loadCustomApps();
 
 const stopSweep = runsWorker ? await startWorker() : undefined;
 const app = runsApi ? buildServer() : undefined;

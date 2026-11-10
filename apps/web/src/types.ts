@@ -111,6 +111,23 @@ export type JsonSchema = {
   format?: string;
 };
 
+export type CustomAppAction = {
+  name: string;
+  method: HttpMethod;
+  path: string;
+  fields: { name: string; required: boolean }[];
+  bodyTemplate?: string;
+};
+
+export type CustomAppDraft = {
+  name: string;
+  baseUrl: string;
+  authType: "bearer" | "header" | "basic";
+  headerName?: string;
+  testPath: string;
+  actions: CustomAppAction[];
+};
+
 export type ConnectorInfo = {
   id: string;
   name: string;
@@ -118,6 +135,8 @@ export type ConnectorInfo = {
   configured: boolean;
   tokenLabel?: string;
   tokenHelp?: string;
+  // Only set for an app added on the Integrations page.
+  customHost?: string;
   actions: { id: string; description: string; inputSchema: JsonSchema }[];
 };
 
@@ -127,6 +146,12 @@ export type Connection = {
   name: string;
   account: string | null;
   status: "active" | "needs_reconnect";
+  createdBy: string | null;
+  createdAt: string;
+  lastCheckedAt: string | null;
+  // When it stops working on its own, for example a Google connection in Testing status.
+  expiresAt: string | null;
+  usedBy: { id: string; name: string }[];
 };
 
 export type Role = "administrator" | "workflow_creator" | "business_user" | "technical_operator";
@@ -146,6 +171,8 @@ export type Member = {
 export type Session = { user: Member; permissions: string[]; workspaceName: string };
 export type AuthStatus = { workspaceExists: boolean; session: Session | null };
 export type Usage = { used: number; limit: number; needsAttention: number };
+export type NotificationItem = { id: string; kind: "failed" | "approval" | "retry" | "connection"; text: string; detail: string | null; happenedAt: string; href: string };
+export type Notifications = { items: NotificationItem[]; unread: number };
 export type Workspace = { id: number; name: string; monthlyRunLimit: number };
 
 export type RunTotals = { total: number; succeeded: number; failed: number; active: number; average_seconds: number };

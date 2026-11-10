@@ -107,7 +107,7 @@ export function isPrivateAddress(address: string): boolean {
   return privateAddresses.check(address, isIP(address) === 6 ? "ipv6" : "ipv4");
 }
 
-async function assertPublicAddress(url: URL): Promise<void> {
+export async function assertPublicAddress(url: URL): Promise<void> {
   const hostname = url.hostname.replace(/^\[|\]$/g, "");
   const addresses = isIP(hostname) ? [hostname] : (await lookup(hostname, { all: true })).map((item) => item.address);
 

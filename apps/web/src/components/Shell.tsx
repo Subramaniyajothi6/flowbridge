@@ -1,10 +1,12 @@
-import { BarChart3, Bell, BookOpen, History, LayoutDashboard, LayoutGrid, LogOut, Plug, Settings, Users, Workflow } from "lucide-react";
+import { BarChart3, BookOpen, History, LayoutDashboard, LayoutGrid, LogOut, Plug, Settings, Users, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { api } from "../api.ts";
 import { ROLE_LABELS, useAuth } from "../auth.tsx";
 import { formatNumber, initials } from "../format.ts";
 import { useLoad } from "../useLoad.ts";
+import { AccountMenu } from "./AccountMenu.tsx";
+import { NotificationBell } from "./NotificationBell.tsx";
 
 const links = [
   { to: "/overview", label: "Overview", icon: LayoutDashboard },
@@ -86,11 +88,9 @@ export function Shell({ children }: { children: ReactNode }) {
               <span className="num muted">{formatNumber(usage.data.used)} of {formatNumber(usage.data.limit)} runs</span>
             </div>
           )}
-          {session && <span className="small muted hide-m top-role">{ROLE_LABELS[session.user.role]}</span>}
-          <Link className="btn btn-g btn-ic top-bell" to="/overview" aria-label={needsAttention > 0 ? `${needsAttention} items need attention` : "Nothing needs attention"}>
-            <Bell size={16} aria-hidden="true" />
-            {needsAttention > 0 && <span className="dot err" />}
-          </Link>
+          {session && <span className="role-chip hide-m">{ROLE_LABELS[session.user.role]}</span>}
+          <NotificationBell />
+          <AccountMenu />
         </header>
 
         {session?.user.mustChangePassword && pathname !== "/settings" && (

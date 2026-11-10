@@ -1,0 +1,2 @@
+ALTER TABLE "activity" ADD COLUMN "is_admin_only" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+UPDATE "activity" SET "is_admin_only" = true WHERE "description" LIKE 'reset %''s password' OR "description" LIKE 'updated %''s access' OR "description" LIKE 'added % to the workspace' OR "description" = 'changed the workspace settings' OR "description" LIKE 'changed the % logo';

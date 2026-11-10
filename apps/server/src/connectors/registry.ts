@@ -11,6 +11,15 @@ export const connectors: Record<string, Connector> = {
   [stripe.id]: stripe,
 };
 
+// Used for apps added on the Integrations page, which are stored in the database.
+export function registerConnector(connector: Connector): void {
+  connectors[connector.id] = connector;
+}
+
+export function unregisterConnector(id: string): void {
+  delete connectors[id];
+}
+
 // Object.hasOwn stops names like "toString" from matching built-in properties.
 export function getConnector(id: string): Connector | undefined {
   return Object.hasOwn(connectors, id) ? connectors[id] : undefined;

@@ -1,9 +1,10 @@
 import { desc, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { requirePermission } from "../auth/sessions.ts";
+import { hasPermission } from "../auth/permissions.ts";
+import { currentUser, requirePermission } from "../auth/sessions.ts";
 import { db } from "../db/client.ts";
-import { activity, connections, triggers, workspace } from "../db/schema.ts";
+import { activity, connections, users, workspace } from "../db/schema.ts";
 import { ADVANCE_RUN_QUEUE, boss } from "../engine/queue.ts";
 import { countLiveRunsThisMonth } from "../engine/create-run.ts";
 
@@ -44,7 +45,72 @@ async function runsNeedingAttention() {
     limit 8`);
 }
 
+type Notification = { id: string; kind: "failed" | "approval" | "retry" | "connection"; text: string; detail: string | null; happenedAt: string; href: string };
+
+type NotifiableRun = { id: string; workflow_name: string; status: string; error: string | null; happened_at: string; wait_kind: string | null; step_name: string | null };
+
+// Worked out from the runs themselves, so a notification can never disagree with what really happened.
+async function runNotifications(): Promise<Notification[]> {
+  const found = await rows<NotifiableRun>(sql`
+    select r.id, w.name as workflow_name, r.status, r.error, r.updated_at as happened_at, s.wait_kind,
+      (select step ->> 'name' from jsonb_array_elements(v.definition -> 'steps') step where step ->> 'id' = s.step_id) as step_name
+    from runs r
+    join workflows w on w.id = r.workflow_id
+    join workflow_versions v on v.id = r.version_id
+    left join step_runs s on s.run_id = r.id and (
+      (r.status = 'failed' and s.status = 'failed')
+      or (r.status = 'waiting' and s.status = 'waiting' and s.wait_kind in ('approval', 'retry')))
+    where r.mode = 'live' and (
+      (r.status = 'failed' and r.created_at >= now() - interval '7 days'
+        and not exists (select 1 from runs retry where retry.retry_of_run_id = r.id))
+      or (r.status = 'waiting' and s.id is not null))
+    order by r.updated_at desc
+    limit 10`);
+
+  // A run can have more than one matching step, and only needs one notification.
+  const oncePerRun = [...new Map(found.map((run) => [run.id, run])).values()];
+
+  return oncePerRun.map((run) => {
+    const shared = { id: run.id, happenedAt: run.happened_at, href: `/executions/${run.id}` };
+    const step = run.step_name ?? "a step";
+    if (run.status === "failed") return { ...shared, kind: "failed", text: `${run.workflow_name} failed at ${step}`, detail: run.error };
+    if (run.wait_kind === "approval") return { ...shared, kind: "approval", text: `${run.workflow_name} is waiting for a decision at ${step}`, detail: null };
+    return { ...shared, kind: "retry", text: `${run.workflow_name} is retrying ${step} after a failure`, detail: null };
+  });
+}
+
+async function connectionNotifications(): Promise<Notification[]> {
+  const broken = await db
+    .select({ id: connections.id, name: connections.name, updatedAt: connections.updatedAt })
+    .from(connections)
+    .where(eq(connections.status, "needs_reconnect"));
+
+  return broken.map((connection) => ({
+    id: connection.id,
+    kind: "connection",
+    text: `${connection.name} needs connecting again`,
+    detail: null,
+    happenedAt: connection.updatedAt.toISOString(),
+    href: "/integrations",
+  }));
+}
+
 export function registerMonitoringRoutes(app: FastifyInstance): void {
+  app.get("/api/monitoring/notifications", async (request) => {
+    const user = currentUser(request);
+    const canSeeConnections = hasPermission(user.role, "integrations.view");
+    const items = [...(await runNotifications()), ...(canSeeConnections ? await connectionNotifications() : [])]
+      .sort((first, second) => new Date(second.happenedAt).getTime() - new Date(first.happenedAt).getTime());
+
+    const readUpTo = user.notificationsReadAt?.getTime() ?? 0;
+    return { items, unread: items.filter((item) => new Date(item.happenedAt).getTime() > readUpTo).length };
+  });
+
+  app.post("/api/monitoring/notifications/read", async (request, reply) => {
+    await db.update(users).set({ notificationsReadAt: sql`now()` }).where(eq(users.id, currentUser(request).id));
+    return reply.status(204).send();
+  });
+
   // Shown to everyone, in the top bar.
   app.get("/api/monitoring/usage", async () => {
     const [row] = await db.select({ limit: workspace.monthlyRunLimit }).from(workspace).where(eq(workspace.id, 1));
@@ -52,7 +118,10 @@ export function registerMonitoringRoutes(app: FastifyInstance): void {
     return { used: await countLiveRunsThisMonth(), limit: row?.limit ?? 0, needsAttention: attention.length };
   });
 
-  app.get("/api/monitoring/overview", { preHandler: requirePermission("runs.view") }, async () => {
+  app.get("/api/monitoring/overview", { preHandler: requirePermission("runs.view") }, async (request) => {
+    // Member, password and workspace changes are left out for everyone but Administrators.
+    const isAdministrator = hasPermission(currentUser(request).role, "members.manage");
+
     const [workflowCounts] = await rows<{ total: number; published: number; drafts: number }>(sql`
       select count(*)::int as total,
         count(*) filter (where current_version_id is not null)::int as published,
@@ -76,7 +145,12 @@ export function registerMonitoringRoutes(app: FastifyInstance): void {
       attention: await runsNeedingAttention(),
       mostUsed,
       recent,
-      activity: await db.select().from(activity).orderBy(desc(activity.createdAt)).limit(6),
+      activity: await db
+        .select({ id: activity.id, actorName: activity.actorName, description: activity.description, createdAt: activity.createdAt })
+        .from(activity)
+        .where(isAdministrator ? undefined : eq(activity.isAdminOnly, false))
+        .orderBy(desc(activity.createdAt))
+        .limit(6),
     };
   });
 

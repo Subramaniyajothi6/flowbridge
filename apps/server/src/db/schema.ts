@@ -1,4 +1,5 @@
 import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
+import type { CustomAppDefinition } from "../connectors/custom-app.ts";
 import type { WorkflowDefinition } from "../engine/definition.ts";
 import type { PollConfig, PollCursor, ScheduleConfig } from "../triggers/definition.ts";
 
@@ -28,6 +29,8 @@ export const users = pgTable("users", {
   isActive: boolean("is_active").notNull().default(true),
   timezone: text("timezone").notNull().default("Asia/Kolkata"),
   lastSignInAt: timestamp("last_sign_in_at", { withTimezone: true }),
+  // Notifications from before this time count as read.
+  notificationsReadAt: timestamp("notifications_read_at", { withTimezone: true }),
   createdAt: createdAt(),
 });
 
@@ -44,6 +47,8 @@ export const activity = pgTable("activity", {
   id: uuid("id").primaryKey().defaultRandom(),
   actorName: text("actor_name").notNull(),
   description: text("description").notNull(),
+  // Member, password and workspace changes are only shown to Administrators.
+  isAdminOnly: boolean("is_admin_only").notNull().default(false),
   createdAt: createdAt(),
 });
 
@@ -108,7 +113,26 @@ export const connections = pgTable("connections", {
   // Always encrypted. See connections/crypto.ts.
   encryptedCredentials: text("encrypted_credentials").notNull(),
   status: text("status").$type<"active" | "needs_reconnect">().notNull().default("active"),
+  // Who connected it, and when it was last proved to work.
+  createdBy: text("created_by"),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
   createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Apps an Administrator added on the Integrations page. Keys are kept in connections, never here.
+export const customApps = pgTable("custom_apps", {
+  id: text("id").primaryKey(),
+  definition: jsonb("definition").$type<CustomAppDefinition>().notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: createdAt(),
+});
+
+// A logo chosen for any app, built-in or custom, as a small image data address.
+// A built-in app without a row here shows the logo that ships with FlowBridge.
+export const appLogos = pgTable("app_logos", {
+  connectorId: text("connector_id").primaryKey(),
+  logo: text("logo").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

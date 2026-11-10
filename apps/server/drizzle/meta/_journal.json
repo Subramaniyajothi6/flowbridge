@@ -36,6 +36,48 @@
       "when": 1794252993927,
       "tag": "0004_typical_mojo",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794322363396,
+      "tag": "0005_high_omega_red",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794328345813,
+      "tag": "0006_blushing_wild_child",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794333489811,
+      "tag": "0007_abnormal_naoko",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794334233871,
+      "tag": "0008_classy_wind_dancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794335671700,
+      "tag": "0009_polite_whistler",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794335986074,
+      "tag": "0010_modern_wonder_man",
+      "breakpoints": true
     }
   ]
 }

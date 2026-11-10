@@ -8,6 +8,18 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Log (newest first)
 
+### 2026-11-11
+- The notification bell now opens a Notifications panel instead of going to Overview. Read status is saved per person.
+- Overview: Recent activity is full width, one entry per line, and the cards above it line up in two rows.
+- New **Add app** on Integrations, for Administrators: add an app such as Jira by describing its web API. Jira was added and connected this way with a real account, but no workflow has used it yet.
+- Logos: an uploaded logo is used, or else the app's own site icon is fetched. Administrators can change any app's logo, including the built-in ones.
+- Integrations now has a Connected accounts tab (status, used by, last checked, added by), search and category chips, an "Expiring soon" status for Google connections, and a confirm step before disconnecting.
+- Avatar menu at the top right, with Settings, Help and Sign out.
+- Member, password, settings and logo activity is now shown only to Administrators.
+- A connection's key is now removed from any reply before it is saved. A test service that echoes headers showed this was needed.
+- 137 automated checks and the type check pass. Every role was checked in the browser except Business User, whose demo password Jonah reset on 2026-11-10.
+- Four small database updates were added and applied to the shared database.
+
 ### 2026-11-10, laptop, manual check
 - Pulled the stage 5 to 7 work and started checking the whole app by hand.
 - Proved the "Welcome new customers" template in a test run with real accounts: rows added to Sheets, email sent, Slack message posted.
@@ -45,12 +57,13 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Next
 
-1. Finish the manual check: Integrations Test buttons, build, publish and run, failure and retry, approval, and signing in as each role.
-2. Deploy on Render, following the Deployment section of `README.md`.
-3. Before sharing the address, change the demo password by running the seed command with a new `SEED_PASSWORD`.
-4. Add the public address to the Google OAuth redirect addresses, then reconnect Gmail and Sheets on the live site.
-5. Copy `reports` and `research_notes` into `docs`, and make the repository public or share access.
-6. Add the deployment link to the README and the final demonstration notes, then rehearse the demonstration.
+1. Finish the manual check: build, publish and run, failure and retry, approval. The Integrations Test buttons and the role checks were done on 2026-11-11.
+2. Use the connected Jira app in a workflow ("Create issue" in project `SCRUM`), and walk through adding GitHub with Add app.
+3. Deploy on Render, following the Deployment section of `README.md`.
+4. Before sharing the address, change the demo password by running the seed command with a new `SEED_PASSWORD`.
+5. Add the public address to the Google OAuth redirect addresses, then reconnect Gmail and Sheets on the live site.
+6. Copy `reports` and `research_notes` into `docs`, and make the repository public or share access.
+7. Add the deployment link to the README and the final demonstration notes, then rehearse the demonstration.
 
 ## Setting up a new machine
 

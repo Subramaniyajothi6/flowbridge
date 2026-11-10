@@ -81,27 +81,33 @@ async function refreshWhileLocked(connectionId: string, provider: OAuthProviderN
 
 function buildRequest(connector: Connector, secret: string): ConnectorRequest {
   return async (url, options = {}) => {
-    const { hostname } = new URL(url);
-    if (!connector.allowedHosts.includes(hostname)) {
-      throw new Error(`${connector.name} credentials cannot be sent to ${hostname}`);
+    const target = new URL(url);
+    if (!connector.allowedHosts.includes(target.hostname)) {
+      throw new Error(`${connector.name} credentials cannot be sent to ${target.hostname}`);
     }
+    await connector.checkBeforeSend?.(target);
 
+    const credentialHeaders = connector.credentialHeaders?.(secret) ?? { authorization: `Bearer ${secret}` };
     const response = await fetch(url, {
       method: options.method ?? "GET",
-      headers: { ...options.headers, authorization: `Bearer ${secret}` },
+      headers: { ...options.headers, ...credentialHeaders },
       body: options.body,
       signal: AbortSignal.timeout(TIMEOUT_MS),
       redirect: "error",
     });
 
-    const text = await readLimitedText(response);
+    // A service can repeat back what it was sent, and replies are saved and shown to people.
+    const text = hideCredential(await readLimitedText(response), [secret, ...Object.values(credentialHeaders)]);
     const body = parseBody(text, response.headers.get("content-type"));
     if (!response.ok) {
-      const reason = describeError(body).replaceAll(secret, HIDDEN);
-      throw new Error(`${connector.name} replied with status ${response.status}: ${reason}`);
+      throw new Error(`${connector.name} replied with status ${response.status}: ${describeError(body)}`);
     }
     return body;
   };
+}
+
+function hideCredential(text: string, values: string[]): string {
+  return values.reduce((result, value) => result.replaceAll(value, HIDDEN), text);
 }
 
 // Services put their error message in slightly different places.

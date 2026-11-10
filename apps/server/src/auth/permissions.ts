@@ -18,6 +18,7 @@ const PERMISSIONS = {
   "approvals.decide": [ADMIN, CREATOR, BUSINESS],
   "integrations.view": [ADMIN, CREATOR, OPERATOR],
   "integrations.manage": [ADMIN, CREATOR],
+  "apps.manage": [ADMIN],
   "system.view": [ADMIN, CREATOR, OPERATOR],
   "members.manage": [ADMIN],
   "settings.manage": [ADMIN],

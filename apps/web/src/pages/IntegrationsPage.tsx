@@ -1,4 +1,4 @@
-import { Check, KeyRound, Link2, ShieldCheck, TriangleAlert } from "lucide-react";
+import { KeyRound, Plus, Search, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api.ts";
@@ -7,6 +7,12 @@ import { PageHead, Shell } from "../components/Shell.tsx";
 import { ServiceLogo } from "../components/StepIcon.tsx";
 import type { Connection, ConnectorInfo } from "../types.ts";
 import { useLoad } from "../useLoad.ts";
+import { AddAppDialog } from "./AddAppDialog.tsx";
+import { ConnectedAccounts, DisconnectButton } from "./ConnectedAccounts.tsx";
+import { connectionState, expiryText, StateBadge, worstState } from "./connection-status.tsx";
+import { LogoPicker } from "../components/LogoPicker.tsx";
+import { useLogos } from "../logos.tsx";
+import { LOGO_HINT, readLogoFile } from "./logo-file.ts";
 
 type Message = { text: string; isError: boolean };
 
@@ -26,12 +32,26 @@ export function IntegrationsPage() {
       : null;
   const [message, setMessage] = useState<Message | null>(initial);
   const [openConnectorId, setOpenConnectorId] = useState<string | null>(null);
+  const [isAddingApp, setIsAddingApp] = useState(false);
+  const { can } = useAuth();
 
   const connectors = useLoad(api.listConnectors);
   const connections = useLoad(api.listConnections);
 
+  // Technical Operators mostly check existing accounts, so they start on that tab.
+  const [tab, setTab] = useState<"directory" | "accounts">(can("integrations.manage") ? "directory" : "accounts");
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("All");
+
   const connectionsFor = (connectorId: string) => connections.data?.filter((item) => item.connector === connectorId) ?? [];
   const openConnector = connectors.data?.find((connector) => connector.id === openConnectorId);
+
+  // Only categories that have an app in them are offered.
+  const categories = ["All", ...new Set((connectors.data ?? []).map(categoryOf))];
+  const visibleConnectors = (connectors.data ?? []).filter((connector) => {
+    const words = `${connector.name} ${categoryOf(connector)} ${descriptionOf(connector)}`.toLowerCase();
+    return (category === "All" || categoryOf(connector) === category) && words.includes(search.trim().toLowerCase());
+  });
 
   // While the dialog is open it covers the page, so messages appear inside it.
   const notice = <div role="status">{message && <div className={`notice ${message.isError ? "err" : "ok"}`}>{message.text}</div>}</div>;
@@ -44,23 +64,58 @@ export function IntegrationsPage() {
   return (
     <Shell>
       <div className="page">
-        <PageHead title="Integrations" subtitle="Connect the services your workflows use. Credentials are encrypted before they are stored." />
+        <PageHead title="Integrations" subtitle="Connect the services your workflows use. Credentials are encrypted before they are stored.">
+          {can("apps.manage") && <button className="btn btn-p" onClick={() => setIsAddingApp(true)}><Plus size={15} aria-hidden="true" /> Add app</button>}
+        </PageHead>
 
         {!openConnector && notice}
         {connectors.error && <div className="notice err">{connectors.error}</div>}
         {connections.error && <div className="notice err">{connections.error}</div>}
 
-        <div className="g-auto">
-          {/* Waits for both lists, so a connected service never shows Connect for a moment. */}
-          {connections.data && connectors.data?.map((connector) => (
-            <ConnectorCard
-              key={connector.id}
-              connector={connector}
-              connections={connectionsFor(connector.id)}
-              onOpen={() => openDialog(connector.id)}
-            />
-          ))}
+        <div className="tabs" role="tablist">
+          <button role="tab" aria-selected={tab === "directory"} className={`tab ${tab === "directory" ? "is-on" : ""}`} onClick={() => setTab("directory")}>Directory</button>
+          <button role="tab" aria-selected={tab === "accounts"} className={`tab ${tab === "accounts" ? "is-on" : ""}`} onClick={() => setTab("accounts")}>
+            Connected accounts{connections.data ? ` (${connections.data.length})` : ""}
+          </button>
         </div>
+
+        {tab === "directory" && (
+          <>
+            <div className="row wrap">
+              <div className="list-search">
+                <span className="search-ic"><Search size={14} aria-hidden="true" /></span>
+                <input className="input" type="search" aria-label="Search integrations" placeholder="Search integrations" value={search} onChange={(event) => setSearch(event.target.value)} />
+              </div>
+              <div className="row wrap" role="group" aria-label="Filter by category">
+                {categories.map((item) => (
+                  <button key={item} className={`chip ${category === item ? "is-on" : ""}`} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="g-auto">
+              {/* Waits for both lists, so a connected service never shows Connect for a moment. */}
+              {connections.data && visibleConnectors.map((connector) => (
+                <ConnectorCard
+                  key={connector.id}
+                  connector={connector}
+                  connections={connectionsFor(connector.id)}
+                  onOpen={() => openDialog(connector.id)}
+                />
+              ))}
+            </div>
+            {connections.data && visibleConnectors.length === 0 && <p className="muted">No apps match. Try a different search or category.</p>}
+          </>
+        )}
+
+        {tab === "accounts" && connections.data && connectors.data && (
+          <ConnectedAccounts
+            connections={connections.data}
+            connectors={connectors.data}
+            onMessage={setMessage}
+            onChanged={connections.reload}
+          />
+        )}
 
         {openConnector && (
           <ConnectorDialog
@@ -70,6 +125,21 @@ export function IntegrationsPage() {
             onMessage={setMessage}
             onChanged={connections.reload}
             onClose={() => setOpenConnectorId(null)}
+            onAppRemoved={async () => {
+              setOpenConnectorId(null);
+              await connectors.reload();
+            }}
+          />
+        )}
+
+        {isAddingApp && (
+          <AddAppDialog
+            onClose={() => setIsAddingApp(false)}
+            onAdded={async (name) => {
+              setIsAddingApp(false);
+              setMessage({ text: `${name} was added. Connect it with its key to start using it.`, isError: false });
+              await connectors.reload();
+            }}
           />
         )}
       </div>
@@ -77,20 +147,17 @@ export function IntegrationsPage() {
   );
 }
 
-function ConnectionBadge({ connections }: { connections: Connection[] }) {
-  if (connections.length === 0) {
-    return <span className="badge b-off"><Link2 size={12} aria-hidden="true" /> Not connected</span>;
-  }
-  if (connections.some((connection) => connection.status === "needs_reconnect")) {
-    return <span className="badge b-warn"><TriangleAlert size={12} aria-hidden="true" /> Needs reconnecting</span>;
-  }
-  return <span className="badge b-ok"><Check size={12} aria-hidden="true" /> Connected</span>;
+function categoryOf(connector: ConnectorInfo): string {
+  return SERVICE_DETAILS[connector.id]?.category ?? "Custom app";
+}
+
+function descriptionOf(connector: ConnectorInfo): string {
+  return SERVICE_DETAILS[connector.id]?.description ?? `Calls ${connector.customHost}. ${connector.actions.length} ${connector.actions.length === 1 ? "action" : "actions"}.`;
 }
 
 function ConnectorCard({ connector, connections, onOpen }: { connector: ConnectorInfo; connections: Connection[]; onOpen: () => void }) {
   const { can } = useAuth();
   const canManage = can("integrations.manage");
-  const details = SERVICE_DETAILS[connector.id];
   const isOAuth = connector.authType === "oauth";
 
   return (
@@ -99,11 +166,11 @@ function ConnectorCard({ connector, connections, onOpen }: { connector: Connecto
         <ServiceLogo connector={connector.id} large />
         <div className="grow">
           <h2 className="strong int-name">{connector.name}</h2>
-          <div className="small muted">{details?.category}</div>
+          <div className="small muted">{categoryOf(connector)}</div>
         </div>
-        <ConnectionBadge connections={connections} />
+        <StateBadge state={worstState(connections)} />
       </div>
-      <p className="small muted int-desc">{details?.description}</p>
+      <p className="small muted int-desc">{descriptionOf(connector)}</p>
       <div className="row between int-foot">
         <span className="small dim row int-auth">
           {isOAuth ? <ShieldCheck size={13} aria-hidden="true" /> : <KeyRound size={13} aria-hidden="true" />}
@@ -119,9 +186,55 @@ function ConnectorCard({ connector, connections, onOpen }: { connector: Connecto
   );
 }
 
-function ConnectorDialog({ connector, connections, notice, onMessage, onChanged, onClose }: { connector: ConnectorInfo; connections: Connection[]; notice: ReactNode; onMessage: (message: Message) => void; onChanged: () => Promise<void>; onClose: () => void }) {
+function ConnectorDialog({ connector, connections, notice, onMessage, onChanged, onClose, onAppRemoved }: { connector: ConnectorInfo; connections: Connection[]; notice: ReactNode; onMessage: (message: Message) => void; onChanged: () => Promise<void>; onClose: () => void; onAppRemoved: () => Promise<void> }) {
   const { can } = useAuth();
   const canManage = can("integrations.manage");
+  const canChangeLogo = can("apps.manage");
+  const canRemoveApp = connector.customHost !== undefined && canChangeLogo;
+  const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const logos = useLogos();
+  // Only a built-in app has a default logo to go back to.
+  const canUseDefaultLogo = connector.customHost === undefined && logos.addresses[connector.id] !== undefined;
+
+  async function changeLogo(file: File | undefined) {
+    if (!file) return;
+    setIsUploadingLogo(true);
+    try {
+      await api.setLogo(connector.id, await readLogoFile(file));
+      await logos.refresh();
+      onMessage({ text: "Logo changed", isError: false });
+    } catch (error) {
+      onMessage({ text: (error as Error).message, isError: true });
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  }
+
+  async function useDefaultLogo() {
+    try {
+      await api.resetLogo(connector.id);
+      await logos.refresh();
+      onMessage({ text: "Default logo restored", isError: false });
+    } catch (error) {
+      onMessage({ text: (error as Error).message, isError: true });
+    }
+  }
+
+  async function removeApp() {
+    if (!isConfirmingRemove) {
+      setIsConfirmingRemove(true);
+      return;
+    }
+    try {
+      await api.deleteCustomApp(connector.id);
+      onMessage({ text: `${connector.name} was removed`, isError: false });
+      await onAppRemoved();
+    } catch (error) {
+      setIsConfirmingRemove(false);
+      onMessage({ text: (error as Error).message, isError: true });
+    }
+  }
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -154,7 +267,21 @@ function ConnectorDialog({ connector, connections, notice, onMessage, onChanged,
           <ConnectionRow key={connection.id} connection={connection} canManage={canManage} onMessage={onMessage} onChanged={onChanged} />
         ))}
 
+        {canChangeLogo && (
+          <div className="logo-row">
+            <LogoPicker
+              preview={<ServiceLogo connector={connector.id} large />}
+              buttonLabel="Change logo"
+              hint={LOGO_HINT}
+              isBusy={isUploadingLogo}
+              onFile={changeLogo}
+              extra={canUseDefaultLogo && <button className="btn btn-g btn-sm" onClick={useDefaultLogo}>Use default logo</button>}
+            />
+          </div>
+        )}
+
         <div className="modal-a">
+          {canRemoveApp && <button className="btn btn-g app-remove" onClick={removeApp}>{isConfirmingRemove ? "Click again to remove" : "Remove app"}</button>}
           <button className="btn" onClick={onClose}>Close</button>
         </div>
       </div>
@@ -190,7 +317,7 @@ function TokenForm({ connector, onMessage, onChanged }: { connector: ConnectorIn
 }
 
 function ConnectionRow({ connection, canManage, onMessage, onChanged }: { connection: Connection; canManage: boolean; onMessage: (message: Message) => void; onChanged: () => Promise<void> }) {
-  const isExpired = connection.status === "needs_reconnect";
+  const state = connectionState(connection);
 
   async function test() {
     const result = await api.testConnection(connection.id);
@@ -198,20 +325,14 @@ function ConnectionRow({ connection, canManage, onMessage, onChanged }: { connec
     await onChanged();
   }
 
-  async function remove() {
-    await api.deleteConnection(connection.id);
-    onMessage({ text: "Connection removed", isError: false });
-    await onChanged();
-  }
-
   return (
     <div className="conn-row">
       <div className="grow">
         <div className="strong trunc">{connection.account ?? connection.name}</div>
-        {isExpired && <div className="err-msg">Expired. Please connect again.</div>}
+        {expiryText(connection) && <div className={state === "connected" ? "small dim" : "err-msg"}>{expiryText(connection)}</div>}
       </div>
       <button className="btn btn-sm" onClick={test}>Test</button>
-      {canManage && <button className="btn btn-sm btn-g" onClick={remove}>Remove</button>}
+      {canManage && <DisconnectButton connection={connection} onMessage={onMessage} onChanged={onChanged} />}
     </div>
   );
 }

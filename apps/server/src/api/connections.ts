@@ -15,7 +15,8 @@ import { sealCredentials, type Credentials } from "../connections/secrets.ts";
 import { connectors, getConnector } from "../connectors/registry.ts";
 import type { Connector } from "../connectors/types.ts";
 import { db } from "../db/client.ts";
-import { connections, oauthStates } from "../db/schema.ts";
+import { config } from "../config.ts";
+import { connections, oauthStates, workflows, workflowVersions } from "../db/schema.ts";
 
 const idParams = z.object({ id: z.uuid() });
 const connectorParams = z.object({ connector: z.string() });
@@ -40,8 +41,27 @@ const publicColumns = {
   name: connections.name,
   account: connections.account,
   status: connections.status,
+  createdBy: connections.createdBy,
+  lastCheckedAt: connections.lastCheckedAt,
   createdAt: connections.createdAt,
 };
+
+// When a connection will stop working on its own, or null if it does not expire.
+function expiryOf(connectorId: string, createdAt: Date): Date | null {
+  const connector = getConnector(connectorId);
+  const isGoogle = connector?.auth.type === "oauth" && connector.auth.provider === "google";
+  if (!isGoogle || config.GOOGLE_CONNECTION_DAYS <= 0) return null;
+  return new Date(createdAt.getTime() + config.GOOGLE_CONNECTION_DAYS * 86400 * 1000);
+}
+
+// A workflow uses a connection if its published version or its draft mentions the connection's ID.
+async function workflowsUsingConnections(): Promise<{ id: string; name: string; text: string }[]> {
+  const rows = await db
+    .select({ id: workflows.id, name: workflows.name, draft: workflows.draftDefinition, published: workflowVersions.definition })
+    .from(workflows)
+    .leftJoin(workflowVersions, eq(workflows.currentVersionId, workflowVersions.id));
+  return rows.map((row) => ({ id: row.id, name: row.name, text: JSON.stringify([row.draft, row.published]) }));
+}
 
 function humanizeConnector(connectorId: string): string {
   return getConnector(connectorId)?.name ?? connectorId;
@@ -58,6 +78,7 @@ function describeConnector(connector: Connector) {
     name: connector.name,
     authType: auth.type,
     configured: isConfigured(connector),
+    customHost: connector.customHost,
     tokenLabel: auth.type === "token" ? auth.label : undefined,
     tokenHelp: auth.type === "token" ? auth.help : undefined,
     actions: Object.entries(connector.actions).map(([id, action]) => ({
@@ -68,10 +89,10 @@ function describeConnector(connector: Connector) {
   };
 }
 
-async function saveConnection(connector: Connector, name: string, credentials: Credentials): Promise<string> {
+async function saveConnection(connector: Connector, name: string, credentials: Credentials, createdBy: string | null): Promise<string> {
   const [created] = await db
     .insert(connections)
-    .values({ connector: connector.id, name, encryptedCredentials: sealCredentials(credentials) })
+    .values({ connector: connector.id, name, encryptedCredentials: sealCredentials(credentials), createdBy })
     .returning({ id: connections.id });
   return created.id;
 }
@@ -80,7 +101,10 @@ async function saveConnection(connector: Connector, name: string, credentials: C
 async function verifyConnection(connectionId: string): Promise<string> {
   const { connector, request } = await openConnection(connectionId);
   const { account } = await connector.test({ request, idempotencyKey: "" });
-  await db.update(connections).set({ account, status: "active", updatedAt: sql`now()` }).where(eq(connections.id, connectionId));
+  await db
+    .update(connections)
+    .set({ account, status: "active", lastCheckedAt: sql`now()`, updatedAt: sql`now()` })
+    .where(eq(connections.id, connectionId));
   return account;
 }
 
@@ -91,7 +115,14 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
   app.get("/api/connectors", canView, async () => Object.values(connectors).map(describeConnector));
 
   app.get("/api/connections", canView, async () => {
-    return db.select(publicColumns).from(connections).orderBy(desc(connections.createdAt));
+    const rows = await db.select(publicColumns).from(connections).orderBy(desc(connections.createdAt));
+    const workflowTexts = await workflowsUsingConnections();
+
+    return rows.map((row) => ({
+      ...row,
+      expiresAt: expiryOf(row.connector, row.createdAt),
+      usedBy: workflowTexts.filter((workflow) => workflow.text.includes(row.id)).map(({ id, name }) => ({ id, name })),
+    }));
   });
 
   app.post("/api/connections", canManage, async (request, reply) => {
@@ -104,7 +135,7 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
       return reply.status(400).send({ error: connector.auth.patternMessage });
     }
 
-    const id = await saveConnection(connector, body.name ?? connector.name, { type: "token", token: body.token });
+    const id = await saveConnection(connector, body.name ?? connector.name, { type: "token", token: body.token }, currentUser(request).name);
     try {
       const account = await verifyConnection(id);
       await recordActivity(currentUser(request).name, `connected ${connector.name}`);
@@ -185,8 +216,9 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         expiresAt: tokens.expiresAt,
-      });
+      }, request.user?.name ?? null);
       await verifyConnection(id);
+      if (request.user) await recordActivity(request.user.name, `connected ${connector.name}`);
       return reply.redirect("/integrations?connected=1");
     } catch (error) {
       if (id) await db.delete(connections).where(eq(connections.id, id));

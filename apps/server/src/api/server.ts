@@ -5,6 +5,8 @@ import { findSignedInUser } from "../auth/sessions.ts";
 import { db } from "../db/client.ts";
 import { registerAuthRoutes } from "./auth.ts";
 import { registerConnectionRoutes } from "./connections.ts";
+import { registerCustomAppRoutes } from "./custom-apps.ts";
+import { registerLogoRoutes } from "./logos.ts";
 import { registerMemberRoutes } from "./members.ts";
 import { registerMonitoringRoutes } from "./monitoring.ts";
 import { registerWebApp } from "./web-app.ts";
@@ -69,6 +71,8 @@ export function buildServer() {
   registerRunRoutes(app);
   registerTriggerRoutes(app);
   registerConnectionRoutes(app);
+  registerCustomAppRoutes(app);
+  registerLogoRoutes(app);
   registerWebApp(app);
   app.register(webhookRoutes);
   return app;

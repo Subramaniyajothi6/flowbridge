@@ -43,7 +43,7 @@ export function registerMemberRoutes(app: FastifyInstance): void {
       .returning();
     if (!created) return reply.status(409).send({ error: "Someone with that email is already a member" });
 
-    await recordActivity(currentUser(request).name, `added ${created.name} to the workspace`);
+    await recordActivity(currentUser(request).name, `added ${created.name} to the workspace`, "adminOnly");
     return reply.status(201).send({ member: toPublicUser(created), temporaryPassword });
   });
 
@@ -64,7 +64,7 @@ export function registerMemberRoutes(app: FastifyInstance): void {
 
     // A deactivated person is signed out straight away.
     if (changes.isActive === false) await db.delete(sessions).where(eq(sessions.userId, id));
-    await recordActivity(currentUser(request).name, `updated ${updated.name}'s access`);
+    await recordActivity(currentUser(request).name, `updated ${updated.name}'s access`, "adminOnly");
     return toPublicUser(updated);
   });
 
@@ -80,7 +80,7 @@ export function registerMemberRoutes(app: FastifyInstance): void {
     if (!updated) return reply.status(404).send({ error: "Member not found" });
 
     await db.delete(sessions).where(eq(sessions.userId, id));
-    await recordActivity(currentUser(request).name, `reset ${updated.name}'s password`);
+    await recordActivity(currentUser(request).name, `reset ${updated.name}'s password`, "adminOnly");
     return { temporaryPassword };
   });
 
@@ -92,7 +92,7 @@ export function registerMemberRoutes(app: FastifyInstance): void {
   app.patch("/api/workspace", { preHandler: requirePermission("settings.manage") }, async (request) => {
     const body = workspaceBody.parse(request.body);
     const [updated] = await db.update(workspace).set(body).where(eq(workspace.id, sql`1`)).returning();
-    await recordActivity(currentUser(request).name, "changed the workspace settings");
+    await recordActivity(currentUser(request).name, "changed the workspace settings", "adminOnly");
     return updated;
   });
 }

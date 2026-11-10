@@ -86,17 +86,47 @@
 /* The app shell and working pages. */
 .user-out, .user-out:hover { color: #c4c4c5; }
 .top-usage { width: 72px; display: inline-block; }
-.top-role { padding: 0 2px; }
+.role-chip { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 13px; font-size: 12px; font-weight: 620; white-space: nowrap; background: var(--sunken); color: var(--ink-2); }
+.top-avatar { cursor: pointer; }
+.account-pop { top: 42px; right: 0; width: 240px; }
+.account-head { padding: 7px 9px; }
+.used-by { max-width: 200px; }
 .top-bell { position: relative; }
 .top-bell .dot { position: absolute; top: 6px; right: 6px; }
 .top-notice { border-radius: 0; }
+.add-app { width: min(620px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; }
+.add-app-action { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-l); min-width: 0; }
+.add-app-request { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; }
+.app-remove { margin-right: auto; color: var(--err); }
+.logo-preview { width: 36px; height: 36px; object-fit: contain; border-radius: 8px; flex: none; }
+.logo-picker { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 12px; row-gap: 6px; }
+.logo-picker-preview { display: flex; }
+.logo-picker-hint { grid-column: 2; }
+.logo-picker-actions { gap: 6px; flex-wrap: wrap; }
+.logo-picker-button { cursor: pointer; }
+.logo-picker-button:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+.logo-picker-button.is-busy { opacity: .6; cursor: default; }
+.logo-empty { background: var(--sunken); color: var(--ink-3); }
+.logo-row { padding-top: 12px; border-top: 1px solid var(--line); }
+.bell-wrap { position: relative; }
+.bell-pop { top: 42px; right: 0; width: min(340px, 86vw); }
+.bell-head { padding: 5px 9px; min-height: 38px; font-size: 13px; }
+.bell-empty { padding: 6px 9px 10px; }
+.bell-list { max-height: min(420px, 70vh); overflow-y: auto; }
+.bell-item { align-items: flex-start; }
+.bell-item .dot { margin-top: 6px; flex: none; }
+.bell-item .grow { min-width: 0; }
+.bell-detail { display: block; overflow-wrap: anywhere; }
+.bell-time { display: block; }
 .list-search { position: relative; width: min(320px, 100%); }
 .list-search .input { padding-left: 32px; }
 .team-actions { justify-content: flex-end; flex-wrap: nowrap; }
 .team-role { min-width: 170px; }
 .temp-password { font-size: 15px; padding: 10px 12px; word-break: break-all; }
 .settings-form { max-width: 560px; gap: 14px; }
-.g-21 > .col { gap: 20px; }
+.overview-rows { align-items: stretch; }
+.overview-wide { grid-column: 1 / -1; }
+.activity-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 2px 16px; padding: 11px 17px; border-top: 1px solid var(--line); }
 .att-row { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
 .att-row > .grow { min-width: 0; }
 .att-err { color: var(--err); }

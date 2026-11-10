@@ -10,6 +10,9 @@ const envSchema = z.object({
   ENCRYPTION_KEYS: z.string().min(1, "ENCRYPTION_KEYS is missing. See .env.example."),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  // A Google project in "Testing" status gives connections that stop working after 7 days.
+  // Set to 0 once the Google project is published, so connections are no longer shown as expiring.
+  GOOGLE_CONNECTION_DAYS: z.coerce.number().default(7),
   // The address people reach this app on. Leave empty when running locally.
   PUBLIC_URL: z.string().optional(),
   RUN_MODE: z.enum(["all", "api", "worker"]).default("all"),

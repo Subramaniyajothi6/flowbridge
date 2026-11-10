@@ -47,6 +47,8 @@ Dates are in YYYY-MM-DD format.
 | 3.11 | New members get a one-time temporary password from their Administrator (2026-11-10). | There is no free email service in the project. |
 | 3.12 | Approvals can be decided by Administrators, Workflow Creators and Business Users (2026-11-10). | Business Users use the automations and are the likely approvers. Technical Operators investigate faults instead. |
 | 3.13 | The real Sign in page does not list test accounts (2026-11-10). | The prototype listed them for reviewers, but a real sign-in page must not show a password. |
+| 3.14 | Activity about members, passwords, workspace settings and logos is shown only to Administrators (2026-11-11). | Other roles do not need to know who had their password reset or their access changed. |
+| 3.15 | Technical Operators open Integrations on the Connected accounts tab, and can only test accounts there (2026-11-11). | Checking which accounts work and which workflows use them is their job. Changing them is not. |
 
 ## 4. Design
 
@@ -160,6 +162,12 @@ Dates are in YYYY-MM-DD format.
 | 9.16 | Server logs leave out query strings and webhook tokens (2026-11-09). | Addresses can carry sign-in codes and secret tokens. |
 | 9.17 | Credentials are tested when they are added, and are not kept if they fail (2026-11-09). | Mistakes appear immediately rather than during a run. |
 | 9.18 | ~~A simple `/connect` page is used to add connections for now.~~ Replaced by 10.8. | It was only needed until the real interface existed. |
+| 9.19 | An Administrator can add an app such as Jira by describing its web API. It becomes an ordinary connector (2026-11-10). | New tools should not need a code change, and an HTTP step would otherwise keep its key in plain text inside the workflow. |
+| 9.20 | Custom apps must use https, can only send their key to their own host, and are checked against private addresses on every call. They sign in with a bearer token, a named header, or an email and token, with no OAuth (2026-11-10). | Keeps 9.7 and 6.8 true for apps the code knows nothing about. OAuth needs separate setup for each provider. |
+| 9.23 | Every connection records who added it and when it was last proved to work, and shows which workflows use it. Disconnecting asks first and names those workflows (2026-11-11). | A person should know what will break before removing a key. |
+| 9.24 | Google connections show "Expiring soon" in their last two days, based on GOOGLE_CONNECTION_DAYS, which is 7 while the Google project is in Testing (2026-11-11). | Replaces remembering the date. Set it to 0 once the Google project is published. |
+| 9.22 | A custom app uses an uploaded logo if there is one. Otherwise its site icon is fetched and stored, and apps without one get another try at start-up. SVG is refused (2026-11-10). | Stored logos tell no outside service which apps are used. An SVG file can contain code. |
+| 9.21 | Custom apps are loaded into memory at start-up and updated when one is added or removed (2026-11-10). | The rest of the code looks connectors up directly, and the API and worker are one process (5.12). If they are ever split, the worker must reload them. |
 | 9.19 | The Sheets "Add row" action can write column headings, but only when the first row is empty (2026-11-10). | Rows without headings mean nothing to the reader, and existing data must never be overwritten. |
 
 ## 10. Visual builder and screens

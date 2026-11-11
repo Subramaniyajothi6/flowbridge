@@ -1,10 +1,21 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Check, Clock, Loader2, X } from "lucide-react";
 import { createContext, useContext } from "react";
+import { DesignIcon } from "../components/DesignIcon.tsx";
 import { StepIcon, TriggerIcon } from "../components/StepIcon.tsx";
 import { humanize } from "../format.ts";
 import type { StepStatus, WorkflowStep } from "../types.ts";
 import type { FlowNode } from "./flow.ts";
+
+// What the buttons above a selected card can do, given by the builder.
+export type StepActions = {
+  widenSettings: () => void;
+  duplicate: (stepId: string) => void;
+  remove: (stepId: string) => void;
+};
+
+// Empty when the workflow is read-only, so no buttons are shown.
+export const StepActionsContext = createContext<StepActions | null>(null);
 
 // The status of each step in the run being shown. Kept apart from the nodes,
 // so that watching a run never counts as editing the workflow.
@@ -57,9 +68,24 @@ function BranchHandles({ first, second }: { first: { id: string; label: string }
 export function StepNode({ data, selected }: NodeProps<FlowNode>) {
   const step = data.step as WorkflowStep;
   const status = useContext(StepStatusContext).get(step.id);
+  const actions = useContext(StepActionsContext);
 
   return (
     <div className={`node ${selected ? "is-sel" : ""} ${status ? statusClass[status] : ""}`}>
+      {actions && selected && (
+        // "nodrag" stops a press on these buttons from moving the card.
+        <div className="node-bar nodrag">
+          <button className="btn btn-g btn-sm btn-ic" aria-label="Open full step view" title="Open full step view" onClick={actions.widenSettings}>
+            <DesignIcon name="fit" />
+          </button>
+          <button className="btn btn-g btn-sm btn-ic" aria-label="Duplicate step" title="Duplicate" onClick={() => actions.duplicate(step.id)}>
+            <DesignIcon name="copy" />
+          </button>
+          <button className="btn btn-g btn-sm btn-ic is-danger" aria-label="Delete step" title="Delete" onClick={() => actions.remove(step.id)}>
+            <DesignIcon name="trash" />
+          </button>
+        </div>
+      )}
       <Handle type="target" position={Position.Left} />
       <div className="node-b">
         <StepIcon step={step} />

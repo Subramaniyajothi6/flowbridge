@@ -73,7 +73,8 @@ export function AnalyticsPage() {
               </div>
             </section>
 
-            <div className="g-21">
+            {/* Cards side by side start and end level, like on Overview. */}
+            <div className="g-21 overview-rows">
               <section className="card">
                 <div className="card-h"><h2 className="card-t">Most active workflows</h2><span className="small dim">Sorted by runs</span></div>
                 {data.byWorkflow.length === 0 ? <p className="card-b muted">No live runs in this period.</p> : (

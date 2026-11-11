@@ -16,11 +16,13 @@ import { resolveStepInput, runStep } from "../engine/steps/run-step.ts";
 
 const idParams = z.object({ id: z.uuid() });
 const emptyDefinition: WorkflowDefinition = { steps: [], edges: [] };
+const descriptionField = z.string().trim().max(300);
 const createWorkflowBody = z.object({
   name: z.string().min(1).max(120),
+  description: descriptionField.default(""),
   definition: workflowDefinitionSchema.default(emptyDefinition),
 });
-const updateWorkflowBody = z.object({ name: z.string().min(1).max(120) });
+const updateWorkflowBody = z.object({ name: z.string().min(1).max(120).optional(), description: descriptionField.optional() });
 const saveDraftBody = z.object({ definition: workflowDefinitionSchema });
 const startRunBody = z.object({ data: z.unknown().default({}) }).default({ data: {} });
 const testStepBody = z.object({
@@ -41,7 +43,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
 
     const [created] = await db
       .insert(workflows)
-      .values({ name: body.name, webhookToken: randomBytes(24).toString("hex"), draftDefinition: body.definition, updatedBy: person })
+      .values({ name: body.name, description: body.description, webhookToken: randomBytes(24).toString("hex"), draftDefinition: body.definition, updatedBy: person })
       .returning();
     await recordActivity(person, `created ${body.name}`);
     return reply.status(201).send(toPublicWorkflow(created));
@@ -79,11 +81,14 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
       const version = versions.find((item) => item.id === row.currentVersionId);
       // The address of the webhook is a secret, so a list open to every role leaves it out.
       const { webhookToken, draftDefinition, ...listed } = toPublicWorkflow(row);
+      const steps = (draftDefinition ?? version?.definition)?.steps ?? [];
       return {
         ...listed,
         status: publicationStatus(row),
         versionNumber: version?.versionNumber ?? null,
-        stepCount: (draftDefinition ?? version?.definition)?.steps.length ?? 0,
+        stepCount: steps.length,
+        // Lets a workflow without a description be summed up by its steps.
+        stepNames: steps.map((step) => step.name),
         lastRun: latestRuns.find((item) => item.workflowId === row.id) ?? null,
         lastTestRun: latestTestRuns.find((item) => item.workflowId === row.id) ?? null,
         last30Days: usage.find((item) => item.workflowId === row.id) ?? { total: 0, succeeded: 0, failed: 0 },
@@ -106,8 +111,8 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
 
   app.patch("/api/workflows/:id", canEdit, async (request, reply) => {
     const { id } = idParams.parse(request.params);
-    const { name } = updateWorkflowBody.parse(request.body);
-    const [updated] = await db.update(workflows).set({ name, updatedBy: currentUser(request).name, updatedAt: sql`now()` }).where(eq(workflows.id, id)).returning();
+    const { name, description } = updateWorkflowBody.parse(request.body);
+    const [updated] = await db.update(workflows).set({ name, description, updatedBy: currentUser(request).name, updatedAt: sql`now()` }).where(eq(workflows.id, id)).returning();
     if (!updated) return reply.status(404).send({ error: "Workflow not found" });
     return toPublicWorkflow(updated);
   });

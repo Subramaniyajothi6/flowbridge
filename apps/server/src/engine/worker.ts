@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { removeOldActivity } from "../auth/activity.ts";
 import { config } from "../config.ts";
 import { db } from "../db/client.ts";
 import { runs } from "../db/schema.ts";
@@ -13,6 +14,8 @@ const workerId = randomUUID();
 // Runs several workflows side by side, so one slow workflow does not hold up the others.
 const RUNS_AT_ONCE = 3;
 
+const ONE_DAY_SECONDS = 24 * 60 * 60;
+
 export async function startWorker(): Promise<() => void> {
   await boss.work<AdvanceRunJob>(
     ADVANCE_RUN_QUEUE,
@@ -23,12 +26,14 @@ export async function startWorker(): Promise<() => void> {
   const stopSweep = repeatWithoutOverlap(sweepAbandonedRuns, config.SWEEP_SECONDS, "Sweep");
   const stopTriggers = repeatWithoutOverlap(fireDueTriggers, config.TRIGGER_TICK_SECONDS, "Triggers");
   const stopWaits = repeatWithoutOverlap(resumeDueWaits, config.TRIGGER_TICK_SECONDS, "Waits");
+  const stopActivityCleanup = repeatWithoutOverlap(removeOldActivity, ONE_DAY_SECONDS, "Activity clean-up");
 
   console.log(`Worker ${workerId} started`);
   return () => {
     stopSweep();
     stopTriggers();
     stopWaits();
+    stopActivityCleanup();
   };
 }
 

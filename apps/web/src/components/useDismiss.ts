@@ -12,10 +12,12 @@ export function useDismiss(container: RefObject<HTMLElement | null>, isOpen: boo
       if (event.key === "Escape") close();
     };
 
-    document.addEventListener("mousedown", closeWhenClickedOutside);
+    // Listens before anything else on the page. The builder's canvas swallows a press that
+    // starts a drag, so a normal listener would never hear it and the panel would stay open.
+    document.addEventListener("mousedown", closeWhenClickedOutside, true);
     document.addEventListener("keydown", closeOnEscape);
     return () => {
-      document.removeEventListener("mousedown", closeWhenClickedOutside);
+      document.removeEventListener("mousedown", closeWhenClickedOutside, true);
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [container, isOpen, close]);

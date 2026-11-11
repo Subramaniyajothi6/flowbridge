@@ -18,7 +18,7 @@ export function TemplatesPage() {
   async function useTemplate(template: Template) {
     setProblem(null);
     try {
-      const workflow = await api.createWorkflow(template.name, withConnections(template.definition, connections.data ?? []));
+      const workflow = await api.createWorkflow(template.name, withConnections(template.definition, connections.data ?? []), template.description);
       navigate(`/workflows/${workflow.id}`);
     } catch (error) {
       setProblem((error as Error).message);

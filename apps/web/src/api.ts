@@ -13,7 +13,8 @@ import type {
   PublicationStatus,
   Role,
   RunDetail,
-  RunSummary,
+  RunFilters,
+  RunPage,
   Samples,
   Session,
   Trigger,
@@ -73,13 +74,14 @@ export const api = {
   notifications: () => request<Notifications>("/api/monitoring/notifications"),
   markNotificationsRead: () => request<void>("/api/monitoring/notifications/read", { method: "POST", body: {} }),
   overview: () => request<Overview>("/api/monitoring/overview"),
-  activity: (search?: string, before?: string) => request<ActivityPage>(`/api/monitoring/activity${query({ search, before })}`),
+  activity: (search: string, page: number) => request<ActivityPage>(`/api/monitoring/activity${query({ search, page: String(page) })}`),
   analytics: (days: number) => request<Analytics>(`/api/monitoring/analytics?days=${days}`),
   health: () => request<Health>("/api/monitoring/health"),
 
   listWorkflows: () => request<WorkflowSummary[]>("/api/workflows"),
   getWorkflow: (id: string) => request<WorkflowDetail>(`/api/workflows/${id}`),
-  createWorkflow: (name: string, definition?: Definition) => request<Workflow>("/api/workflows", { method: "POST", body: { name, definition } }),
+  createWorkflow: (name: string, definition?: Definition, description?: string) =>
+    request<Workflow>("/api/workflows", { method: "POST", body: { name, definition, description } }),
   renameWorkflow: (id: string, name: string) => request<Workflow>(`/api/workflows/${id}`, { method: "PATCH", body: { name } }),
   deleteWorkflow: (id: string) => request<void>(`/api/workflows/${id}`, { method: "DELETE" }),
   saveDraft: (id: string, definition: Definition) =>
@@ -93,7 +95,8 @@ export const api = {
     request<{ id: string }>(`/api/workflows/${workflowId}/runs`, { method: "POST", body: { data } }),
   testWorkflow: (workflowId: string, data: unknown) =>
     request<{ id: string }>(`/api/workflows/${workflowId}/test-run`, { method: "POST", body: { data } }),
-  listRuns: (status?: string, mode?: string) => request<RunSummary[]>(`/api/runs${query({ status, mode })}`),
+  listRuns: ({ page, pageSize, ...filters }: RunFilters) =>
+    request<RunPage>(`/api/runs${query({ ...filters, page: String(page), pageSize: pageSize ? String(pageSize) : undefined })}`),
   getRun: (id: string) => request<RunDetail>(`/api/runs/${id}`),
   retryRun: (id: string, from: "failed" | "start") => request<{ id: string }>(`/api/runs/${id}/retry`, { method: "POST", body: { from } }),
   decideApproval: (runId: string, stepId: string, approved: boolean, note: string) =>

@@ -10,6 +10,22 @@ export function formatDate(value: string | null): string {
   return new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: displayTimezone });
 }
 
+// Recent times read the way people say them: "Just now", "5 min ago", "Today, 09:00", "Yesterday, 17:52".
+// Anything older falls back to the full date.
+// With "exact", recent times keep their seconds instead of "5 min ago": "Today, 10:43:02".
+export function formatRelative(value: string, { exact = false } = {}): string {
+  const then = new Date(value);
+  const minutesAgo = Math.floor((Date.now() - then.getTime()) / 60_000);
+  if (!exact && minutesAgo < 1) return "Just now";
+  if (!exact && minutesAgo < 60) return `${minutesAgo} min ago`;
+
+  const dayOf = (date: Date) => date.toLocaleDateString("en-CA", { timeZone: displayTimezone });
+  const time = then.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: exact ? "2-digit" : undefined, timeZone: displayTimezone });
+  if (dayOf(then) === dayOf(new Date())) return `Today, ${time}`;
+  if (dayOf(then) === dayOf(new Date(Date.now() - 86_400_000))) return `Yesterday, ${time}`;
+  return formatDate(value);
+}
+
 // "Tuesday, 10 November 2026".
 export function formatDay(value: string): string {
   return new Date(value).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: displayTimezone });

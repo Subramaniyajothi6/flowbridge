@@ -23,6 +23,11 @@
 .fb-canvas .react-flow__edge:hover .react-flow__edge-path { stroke: var(--brand); stroke-width: 2.25; }
 .fb-canvas .react-flow__connection-path { stroke: var(--brand); stroke-width: 2; stroke-dasharray: 5 4; }
 .fb-canvas .react-flow__edge-text { font: 600 11px var(--sans); fill: var(--ink-2); }
+/* Error paths are red and dashed, so they are never mistaken for the normal path. */
+.fb-canvas .react-flow__edge.is-error-edge .react-flow__edge-path { stroke: var(--err); stroke-dasharray: 6 4; }
+.fb-canvas .react-flow__edge.is-error-edge:hover .react-flow__edge-path,
+.fb-canvas .react-flow__edge.is-error-edge.selected .react-flow__edge-path { stroke: var(--err); stroke-width: 2.25; }
+.fb-canvas .react-flow__edge.is-error-edge .react-flow__edge-text { fill: var(--err); }
 .fb-canvas .react-flow__handle {
   width: 12px; height: 12px; background: var(--surface); border: 2px solid #8d8d8f;
 }
@@ -126,7 +131,18 @@
 .settings-form { max-width: 560px; gap: 14px; }
 .overview-rows { align-items: stretch; }
 .overview-wide { grid-column: 1 / -1; }
-.activity-more { justify-content: center; }
+.workflow-sort { width: 180px; }
+.run-workflow { width: 210px; }
+.run-date { width: 140px; }
+.nowrap { white-space: nowrap; }
+.workflow-card { padding: 15px; display: flex; flex-direction: column; gap: 10px; position: relative; }
+.workflow-card-top { align-items: flex-start; min-height: 28px; }
+.workflow-card-menu { right: 12px; top: 46px; width: 190px; }
+.workflow-card-desc { min-height: 34px; text-wrap: pretty; }
+.workflow-card-foot { border-top: 1px solid var(--line); padding-top: 9px; }
+.pager {display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; margin-top: 4px; }
+.pager-pages { display: flex; align-items: center; gap: 4px; }
+.pager-gap { width: 24px; text-align: center; color: var(--ink-3); }
 .activity-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 2px 16px; padding: 11px 17px; border-top: 1px solid var(--line); }
 .att-row { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
 .att-row > .grow { min-width: 0; }
@@ -225,3 +241,22 @@
   .b-body, .b-top .b-desk { display: none; }
   .b-small-screen { display: flex; flex: 1; align-items: center; justify-content: center; text-align: center; padding: 32px 20px; }
 }
+
+/* Builder tools that match the design: buttons above a selected card, buttons on a pointed-at line,
+   the dragged card, the problems badge and a wider settings panel. */
+.design-icon { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.node-bar .is-danger, .e-tools .is-danger { color: var(--err); }
+.node-bar { z-index: 5; }
+.e-tools { position: absolute; gap: 2px; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r); padding: 2px; box-shadow: var(--sh-2); pointer-events: all; z-index: 5; }
+.canvas-tools .pct { display: inline-grid; place-items: center; }
+.ghost-fixed { position: fixed; }
+.ghost-fixed .trunc { min-width: 0; }
+.canvas-view { width: auto; padding: 0 8px; font-size: 12px; white-space: nowrap; }
+.problems-btn { color: var(--err); border-color: var(--err); }
+.problems-btn:hover { background: var(--err-t); }
+.problems-pop { top: 40px; right: 0; width: min(340px, 80vw); }
+.problem-row { padding: 6px 9px; border-top: 1px solid var(--line); }
+.b-cfg.is-wide { width: min(560px, 48vw); }
+.pal-insert { margin: 10px 10px 0; padding: 8px 10px; font-size: 12px; flex-wrap: nowrap; }
+/* Every step block in the Executions step bar is the same size. The colour alone shows a failed step. */
+.trace .seg.err { height: 6px; }

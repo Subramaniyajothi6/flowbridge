@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, lt, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { hasPermission } from "../auth/permissions.ts";
@@ -12,10 +12,10 @@ import { countLiveRunsThisMonth } from "../engine/create-run.ts";
 
 const analyticsQuery = z.object({ days: z.coerce.number().int().refine((days) => [7, 14, 30].includes(days)).default(30) });
 
-const ACTIVITY_PAGE_SIZE = 50;
+const ACTIVITY_PAGE_SIZE = 10;
 const activityQuery = z.object({
-  // The time of the last entry already shown. The next page starts after it.
-  before: z.iso.datetime({ offset: true }).optional(),
+  // Pages are numbered from 1.
+  page: z.coerce.number().int().min(1).default(1),
   search: z.string().trim().max(100).optional(),
 });
 
@@ -188,22 +188,27 @@ export function registerMonitoringRoutes(app: FastifyInstance): void {
 
   // The full activity history, newest first, one page at a time.
   app.get("/api/monitoring/activity", { preHandler: requirePermission("runs.view") }, async (request) => {
-    const { before, search } = activityQuery.parse(request.query);
+    const { page, search } = activityQuery.parse(request.query);
     const isAdministrator = hasPermission(currentUser(request).role, "members.manage");
 
-    const items = await db
-      .select({ id: activity.id, actorName: activity.actorName, description: activity.description, createdAt: activity.createdAt })
-      .from(activity)
-      .where(and(
-        isAdministrator ? undefined : eq(activity.isAdminOnly, false),
-        before ? lt(activity.createdAt, new Date(before)) : undefined,
-        search ? or(ilike(activity.actorName, likePattern(search)), ilike(activity.description, likePattern(search))) : undefined,
-      ))
-      .orderBy(desc(activity.createdAt))
-      // One extra row shows whether there is another page, without a second query.
-      .limit(ACTIVITY_PAGE_SIZE + 1);
+    const matching = and(
+      isAdministrator ? undefined : eq(activity.isAdminOnly, false),
+      search ? or(ilike(activity.actorName, likePattern(search)), ilike(activity.description, likePattern(search))) : undefined,
+    );
 
-    return { items: items.slice(0, ACTIVITY_PAGE_SIZE), hasMore: items.length > ACTIVITY_PAGE_SIZE };
+    const [items, [{ total }]] = await Promise.all([
+      db
+        .select({ id: activity.id, actorName: activity.actorName, description: activity.description, createdAt: activity.createdAt })
+        .from(activity)
+        .where(matching)
+        // The id breaks ties, so entries made at the same moment keep one order across pages.
+        .orderBy(desc(activity.createdAt), desc(activity.id))
+        .limit(ACTIVITY_PAGE_SIZE)
+        .offset((page - 1) * ACTIVITY_PAGE_SIZE),
+      db.select({ total: count() }).from(activity).where(matching),
+    ]);
+
+    return { items, total, pageSize: ACTIVITY_PAGE_SIZE };
   });
 
   app.get("/api/monitoring/analytics", { preHandler: requirePermission("runs.view") }, async (request) => {

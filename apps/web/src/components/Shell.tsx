@@ -36,7 +36,8 @@ export function Shell({ children }: { children: ReactNode }) {
   // Reloads on every page change, so the numbers do not go stale.
   const usage = useLoad(api.usage, [pathname]);
 
-  const section = links.find((link) => pathname.startsWith(link.to))?.label ?? "FlowBridge";
+  // Activity has no sidebar link, so it is named here.
+  const section = links.find((link) => pathname.startsWith(link.to))?.label ?? (pathname.startsWith("/activity") ? "Activity" : "FlowBridge");
   const needsAttention = usage.data?.needsAttention ?? 0;
   const usedShare = usage.data && usage.data.limit > 0 ? Math.min(100, (usage.data.used / usage.data.limit) * 100) : 0;
 

@@ -8,6 +8,14 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Log (newest first)
 
+### 2026-11-12, PC
+- **Builder checked by eye** and fixed: right-click menus now close when the canvas is moved or zoomed, and the "On error" line is drawn below the cards instead of behind them.
+- **Builder tools from the design:** a ghost card while dragging a step in, plus and delete buttons on a pointed-at connection (the plus inserts a step and makes room for it), undo and redo (Ctrl+Z, Ctrl+Y), a live "N problems" badge, buttons above a selected card, and a bottom bar with Tile view, zoom, fit and Tidy. All use the design's own icons.
+- **Activity:** numbered pages of 10 instead of Show more. Entries older than a year are removed once a day. Database update 0012 adds an index for this and is applied.
+- **Workflows:** Sort by, list or grid view (remembered in the browser), grid cards as in the design, and numbered pages. Workflows now have an optional description, set when creating one or taken from a template. Without one, the card sums up the steps. Database update 0013 is applied.
+- **Executions:** numbered pages, Workflow and Date filters, Retry or View on each row, "Failed at" the step's name, a step progress bar, the version that ran, and the design's totals. Export CSV covers every matching run, up to 1,000.
+- 144 automated checks, the type check and the build pass. Everything above was checked in Chrome, except pressing Retry on a real run.
+
 ### 2026-11-11, laptop
 - **Three roles instead of four:** Administrator, Workflow Builder and Business User. Workflow Creator and Technical Operator were merged into Workflow Builder after comparing Workato, Make and n8n (decisions 3.16 to 3.18). Priya and Rahul are now Workflow Builders in the shared database. Business Users can now retry failed runs. Database update 0011 is applied.
 - New **Activity** page with the full history, search, day headings and Show more. Reached from **View all** on Overview and from an Activity tab in Settings.
@@ -67,7 +75,7 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Next
 
-1. Check by eye in the builder: right-click a card and a connection, drag a step from the left panel, and connect by letting go on a card. Then look at Activity and Analytics.
+1. Decide whether old runs should be cleared after a set time, as Activity entries are, and whether a workflow's description should be editable in the builder.
 2. Run the seed command with the demo password so Lena (Business User) can sign in again, then check the app as each of the three roles.
 3. Finish the manual check: publish and run, failure and retry, approval. Publish "Jira test" if it is wanted in the demo.
 4. Deploy on Render, following the Deployment section of `README.md`.
@@ -146,5 +154,5 @@ Outside this repository, in the laptop's `D:\Adz4\FlowBridge Project` folder:
 - The Render free host sleeps after 15 minutes idle. Open the site a few minutes before a demonstration.
 - Demo accounts: jonah@ (Administrator), priya@ and rahul@ (Workflow Builder), lena@ (Business User), all at meridianlogistics.example.
 - The workflow "Welcome new customers" is in the workspace and has passed a test run. It uses a spreadsheet with Customers and Tasks tabs.
-- If `npm start` fails with `getaddrinfo ENOTFOUND` for the Neon address, the network's DNS is refusing it. Setting the Wi-Fi DNS to 8.8.8.8 and 8.8.4.4 fixed it on the laptop.
+- If `npm start` fails with `getaddrinfo ENOTFOUND` for the Neon address, the network's DNS is refusing it. Setting the Wi-Fi DNS to 8.8.8.8 and 8.8.4.4 fixed it on the laptop and the PC.
 - To test a workflow that uses webhook data, enter test data as `{ "body": { "name": "Asha", "email": "you@example.com", "company": "Acme" } }`.

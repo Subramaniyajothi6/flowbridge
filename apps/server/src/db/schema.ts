@@ -43,18 +43,25 @@ export const sessions = pgTable("sessions", {
 });
 
 // A short record of who did what, shown on the Overview page.
-export const activity = pgTable("activity", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  actorName: text("actor_name").notNull(),
-  description: text("description").notNull(),
-  // Member, password and workspace changes are only shown to Administrators.
-  isAdminOnly: boolean("is_admin_only").notNull().default(false),
-  createdAt: createdAt(),
-});
+export const activity = pgTable(
+  "activity",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    actorName: text("actor_name").notNull(),
+    description: text("description").notNull(),
+    // Member, password and workspace changes are only shown to Administrators.
+    isAdminOnly: boolean("is_admin_only").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  // The history is read newest first, one page at a time.
+  (table) => [index().on(table.createdAt, table.id)],
+);
 
 export const workflows = pgTable("workflows", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  // A sentence about what it does, shown on the workflow cards. Empty when none was given.
+  description: text("description").notNull().default(""),
   // Secret part of the webhook address for this workflow.
   webhookToken: text("webhook_token").notNull().unique(),
   // When set, webhook deliveries must be signed with this secret.

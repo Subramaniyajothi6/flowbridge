@@ -44,6 +44,7 @@ export type PublicationStatus = "draft" | "published" | "published_with_edits";
 export type Workflow = {
   id: string;
   name: string;
+  description: string;
   webhookToken: string;
   currentVersionId: string | null;
   requiresSignature: boolean;
@@ -56,6 +57,7 @@ export type WorkflowSummary = Omit<Workflow, "webhookToken"> & {
   status: PublicationStatus;
   versionNumber: number | null;
   stepCount: number;
+  stepNames: string[];
   lastRun: { status: RunStatus; createdAt: string } | null;
   lastTestRun: { status: RunStatus; createdAt: string } | null;
   last30Days: { total: number; succeeded: number; failed: number };
@@ -77,6 +79,20 @@ export type RunSummary = {
   startedAt: string | null;
   finishedAt: string | null;
 };
+
+// How far a run got, one entry for each step of the version that ran.
+export type StepProgress = "succeeded" | "failed" | "running" | "waiting" | "skipped" | "not_reached";
+
+export type RunListItem = RunSummary & {
+  // Empty for a test run, which used an unpublished copy.
+  versionNumber: number | null;
+  steps: StepProgress[];
+  failedStepName: string | null;
+};
+
+export type RunPage = { items: RunListItem[]; total: number; pageSize: number };
+
+export type RunFilters = { status?: string; mode?: string; workflowId?: string; since?: string; page: number; pageSize?: number };
 
 export type StepRun = {
   id: string;
@@ -187,7 +203,7 @@ export type Overview = {
 };
 
 export type ActivityItem = { id: string; actorName: string; description: string; createdAt: string };
-export type ActivityPage = { items: ActivityItem[]; hasMore: boolean };
+export type ActivityPage = { items: ActivityItem[]; total: number; pageSize: number };
 
 export type Analytics = {
   days: number;

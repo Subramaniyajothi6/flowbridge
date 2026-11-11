@@ -17,13 +17,72 @@ const ROW_HEIGHT = 140;
 const EDGE_LABELS: Record<string, string> = { error: "On error" };
 
 function makeEdge(source: string, sourceHandle: string, target: string): Edge {
-  return {
+  const edge: Edge = {
     id: `${source}:${sourceHandle}:${target}`,
     source,
     sourceHandle,
     target,
     label: EDGE_LABELS[sourceHandle],
   };
+  // An error path is drawn red, dashed and below the cards. See edges.tsx.
+  return sourceHandle === "error" ? { ...edge, className: "is-error-edge" } : edge;
+}
+
+// The dot a new step's first connection leaves from.
+export function firstHandleOf(step: WorkflowStep): string {
+  if (step.type === "if") return "true";
+  if (step.type === "approval") return "approved";
+  return "success";
+}
+
+// Puts every step in a column one further than the steps before it, and stacks each column,
+// keeping the steps in the order they were from top to bottom.
+export function tidyLayout(nodes: FlowNode[], edges: Edge[]): FlowNode[] {
+  const columns = new Map(nodes.map((node) => [node.id, node.id === TRIGGER_ID ? 0 : 1]));
+  for (let pass = 0; pass < nodes.length; pass += 1) {
+    for (const edge of edges) {
+      const next = (columns.get(edge.source) ?? 0) + 1;
+      if (next > (columns.get(edge.target) ?? 1)) columns.set(edge.target, next);
+    }
+  }
+
+  const rowsUsed = new Map<number, number>();
+  const rowOf = new Map<string, number>();
+  for (const node of [...nodes].sort((first, second) => first.position.y - second.position.y)) {
+    const column = columns.get(node.id) ?? 1;
+    const row = rowsUsed.get(column) ?? 0;
+    rowsUsed.set(column, row + 1);
+    rowOf.set(node.id, row);
+  }
+
+  return nodes.map((node) => ({ ...node, position: { x: (columns.get(node.id) ?? 1) * COLUMN_WIDTH, y: (rowOf.get(node.id) ?? 0) * ROW_HEIGHT } }));
+}
+
+// Where a step inserted into a connection goes: one column after the step before it,
+// level with the step after it. If that leaves no room, the step after it and everything
+// that follows move right, so no cards end up on top of each other.
+export function makeRoomForInsert(nodes: FlowNode[], edges: Edge[], fromId: string, toId: string): { nodes: FlowNode[]; position: { x: number; y: number } } {
+  const from = nodes.find((node) => node.id === fromId);
+  const to = nodes.find((node) => node.id === toId);
+  if (!from || !to) return { nodes, position: { x: 0, y: 0 } };
+
+  const position = { x: from.position.x + COLUMN_WIDTH, y: to.position.y };
+  const shortBy = position.x + COLUMN_WIDTH - to.position.x;
+  if (shortBy <= 0) return { nodes, position };
+
+  const toMove = new Set([toId]);
+  for (let added = true; added; ) {
+    added = false;
+    for (const edge of edges) {
+      if (toMove.has(edge.source) && !toMove.has(edge.target) && edge.target !== fromId) {
+        toMove.add(edge.target);
+        added = true;
+      }
+    }
+  }
+
+  const moved = nodes.map((node) => (toMove.has(node.id) ? { ...node, position: { x: node.position.x + shortBy, y: node.position.y } } : node));
+  return { nodes: moved, position };
 }
 
 export function connectionToEdge(source: string, sourceHandle: string, target: string): Edge {

@@ -7,9 +7,8 @@ import type { AuthStatus, Role, Session } from "./types.ts";
 
 export const ROLE_LABELS: Record<Role, string> = {
   administrator: "Administrator",
-  workflow_creator: "Workflow Creator",
+  workflow_builder: "Workflow Builder",
   business_user: "Business User",
-  technical_operator: "Technical Operator",
 };
 
 type AuthContextValue = {

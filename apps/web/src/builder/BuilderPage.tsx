@@ -1,5 +1,5 @@
 import { addEdge, useEdgesState, useNodesState, type Connection as FlowConnection, type Edge, type EdgeChange, type NodeChange } from "@xyflow/react";
-import { ChevronLeft, FlaskConical, LayoutGrid, Rocket, Rows3, Save, Search } from "lucide-react";
+import { ArrowRightLeft, ChevronLeft, Copy, FlaskConical, LayoutGrid, Rocket, Rows3, Save, Search, Settings2, Trash2, Unlink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api.ts";
@@ -11,9 +11,10 @@ import type { ConnectorInfo, Definition, PublicationStatus, RunDetail, Samples, 
 import { useLoad } from "../useLoad.ts";
 import type { DataGroup } from "./fields.tsx";
 import { connectionToEdge, definitionToFlow, findProblems, flowToDefinition, listSampleValues, statusMap, stepsBefore, TRIGGER_ID, uniqueStepId, wouldCreateLoop, type FlowNode } from "./flow.ts";
+import { CanvasMenu, type MenuItem } from "./CanvasMenu.tsx";
 import { StepPanel } from "./StepPanel.tsx";
 import { TriggerPanel } from "./TriggerPanel.tsx";
-import { WorkflowCanvas } from "./WorkflowCanvas.tsx";
+import { STEP_DRAG_TYPE, WorkflowCanvas } from "./WorkflowCanvas.tsx";
 
 const COLUMN_GAP = 300;
 
@@ -22,13 +23,52 @@ function summarize(triggers: Trigger[]): string {
   return active === 0 ? "Manual or webhook" : `Manual, webhook + ${active} more`;
 }
 
-function PaletteItem({ icon, label, description, onClick }: { icon: ReactNode; label: string; description: string; onClick: () => void }) {
+// One entry in the left panel. It can be clicked, or dragged onto the canvas.
+type PaletteEntry = {
+  key: string;
+  label: string;
+  description: string;
+  icon: ReactNode;
+  baseId: string;
+  stepName: string;
+  make: (id: string, name: string) => WorkflowStep;
+};
+
+type OpenMenu = { kind: "node" | "edge"; id: string; at: { x: number; y: number } };
+
+// What a connection can be switched to, depending on the kind of step it leaves.
+const BRANCH_LABELS: Record<string, string> = {
+  success: "Run when it succeeds",
+  error: "Run only when it fails",
+  true: "Run when True",
+  false: "Run when False",
+  approved: "Run when approved",
+  rejected: "Run when rejected",
+};
+
+function handlesFor(step: WorkflowStep | undefined): string[] {
+  if (!step) return [];
+  if (step.type === "if") return ["true", "false", "error"];
+  if (step.type === "approval") return ["approved", "rejected", "error"];
+  return ["success", "error"];
+}
+
+function PaletteItem({ entry, onAdd }: { entry: PaletteEntry; onAdd: () => void }) {
   return (
-    <button className="pal-i" title={description} onClick={onClick}>
-      {icon}
+    <button
+      className="pal-i"
+      title={`${entry.description}. Click to add, or drag onto the canvas.`}
+      onClick={onAdd}
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.setData(STEP_DRAG_TYPE, entry.key);
+        event.dataTransfer.effectAllowed = "copy";
+      }}
+    >
+      {entry.icon}
       <span className="grow">
-        <span className="strong trunc pal-label">{label}</span>
-        <span className="small muted trunc pal-desc">{description}</span>
+        <span className="strong trunc pal-label">{entry.label}</span>
+        <span className="small muted trunc pal-desc">{entry.description}</span>
       </span>
     </button>
   );
@@ -75,6 +115,7 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
   const [liveRun, setLiveRun] = useState<RunDetail | null>(null);
   const [hasEditedTestData, setHasEditedTestData] = useState(false);
   const [stepSearch, setStepSearch] = useState("");
+  const [openMenu, setOpenMenu] = useState<OpenMenu | null>(null);
 
   const connectors = useLoad(api.listConnectors);
   const connections = useLoad(api.listConnections);
@@ -150,23 +191,101 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
     setIsDirty(true);
   }
 
-  // Adds a step after the selected one, or at the end of the workflow.
-  function addStep(make: (id: string, name: string) => WorkflowStep, baseId: string, stepName: string) {
-    const stepId = uniqueStepId(baseId, nodes);
-    const source = nodes.find((node) => node.id === selectedId) ?? nodes.filter((node) => !edges.some((edge) => edge.source === node.id)).at(-1) ?? nodes[0];
+  // Clicked: added after the selected step, or at the end of the workflow, and connected to it.
+  // Dropped: placed where it was let go, unconnected, so the person draws its connections.
+  function addStep(entry: PaletteEntry, droppedAt?: { x: number; y: number }) {
+    const stepId = uniqueStepId(entry.baseId, nodes);
+    const source = droppedAt ? null : nodes.find((node) => node.id === selectedId) ?? nodes.filter((node) => !edges.some((edge) => edge.source === node.id)).at(-1) ?? nodes[0];
 
     const newNode: FlowNode = {
       id: stepId,
       type: "step",
       selected: true,
-      position: { x: source.position.x + COLUMN_GAP, y: source.position.y + edges.filter((edge) => edge.source === source.id).length * 130 },
-      data: { step: make(stepId, stepName) },
+      position: droppedAt ?? { x: (source as FlowNode).position.x + COLUMN_GAP, y: (source as FlowNode).position.y + edges.filter((edge) => edge.source === source?.id).length * 130 },
+      data: { step: entry.make(stepId, entry.stepName) },
     };
 
     setNodes((current) => [...current.map((node) => ({ ...node, selected: false })), newNode]);
-    setEdges((current) => [...current, connectionToEdge(source.id, chooseHandle(source, current), stepId)]);
+    if (source) setEdges((current) => [...current, connectionToEdge(source.id, chooseHandle(source, current), stepId)]);
     setSelectedId(stepId);
     setIsDirty(true);
+  }
+
+  // A copy sits just below and to the right of the original, with no connections yet.
+  function duplicateStep(stepId: string) {
+    const original = nodes.find((node) => node.id === stepId);
+    const step = original?.data.step;
+    if (!original || !step) return;
+
+    const copyId = uniqueStepId(step.id, nodes);
+    const copy: FlowNode = {
+      id: copyId,
+      type: "step",
+      selected: true,
+      position: { x: original.position.x + 40, y: original.position.y + 110 },
+      data: { step: { ...structuredClone(step), id: copyId, name: `${step.name} (copy)` } },
+    };
+    setNodes((current) => [...current.map((node) => ({ ...node, selected: false })), copy]);
+    setSelectedId(copyId);
+    setIsDirty(true);
+  }
+
+  function disconnectStep(stepId: string) {
+    setEdges((current) => current.filter((edge) => edge.source !== stepId && edge.target !== stepId));
+    setIsDirty(true);
+  }
+
+  function deleteConnection(edgeId: string) {
+    setEdges((current) => current.filter((edge) => edge.id !== edgeId));
+    setIsDirty(true);
+  }
+
+  // For example, turns an ordinary connection into one that only runs when the step fails.
+  function changeConnection(edgeId: string, handle: string) {
+    setEdges((current) => {
+      const old = current.find((edge) => edge.id === edgeId);
+      if (!old) return current;
+      const replacement = connectionToEdge(old.source, handle, old.target);
+      const others = current.filter((edge) => edge.id !== edgeId);
+      return others.some((edge) => edge.id === replacement.id) ? others : [...others, replacement];
+    });
+    setIsDirty(true);
+  }
+
+  function menuItems(open: OpenMenu): MenuItem[] {
+    if (open.kind === "node") {
+      const openSettings: MenuItem = { label: "Open settings", icon: <Settings2 size={15} aria-hidden="true" />, onSelect: () => setSelectedId(open.id) };
+      if (open.id === TRIGGER_ID) return [openSettings];
+      return [
+        openSettings,
+        { label: "Duplicate", icon: <Copy size={15} aria-hidden="true" />, onSelect: () => duplicateStep(open.id) },
+        { label: "Remove its connections", icon: <Unlink size={15} aria-hidden="true" />, onSelect: () => disconnectStep(open.id) },
+        "separator",
+        { label: "Delete step", icon: <Trash2 size={15} aria-hidden="true" />, danger: true, onSelect: () => deleteStep(open.id) },
+      ];
+    }
+
+    const edge = edges.find((item) => item.id === open.id);
+    const sourceStep = nodes.find((node) => node.id === edge?.source)?.data.step;
+    const switches: MenuItem[] = handlesFor(sourceStep)
+      .filter((handle) => handle !== edge?.sourceHandle)
+      .map((handle) => ({ label: BRANCH_LABELS[handle], icon: <ArrowRightLeft size={15} aria-hidden="true" />, onSelect: () => changeConnection(open.id, handle) }));
+
+    return [
+      ...switches,
+      ...(switches.length > 0 ? ["separator" as const] : []),
+      { label: "Delete connection", icon: <Trash2 size={15} aria-hidden="true" />, danger: true, onSelect: () => deleteConnection(open.id) },
+    ];
+  }
+
+  function menuTitle(open: OpenMenu): string {
+    if (open.kind === "edge") {
+      const edge = edges.find((item) => item.id === open.id);
+      const from = edge?.source === TRIGGER_ID ? "Trigger" : nodes.find((node) => node.id === edge?.source)?.data.step?.name;
+      const to = nodes.find((node) => node.id === edge?.target)?.data.step?.name;
+      return `${from ?? "Step"} → ${to ?? "Step"}`;
+    }
+    return open.id === TRIGGER_ID ? "Trigger" : nodes.find((node) => node.id === open.id)?.data.step?.name ?? "Step";
   }
 
   async function save(): Promise<boolean> {
@@ -276,17 +395,34 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
 
   const matchesSearch = (...texts: string[]) => texts.join(" ").toLowerCase().includes(stepSearch.trim().toLowerCase());
 
-  const coreSteps = [
-    { label: "HTTP request", description: "Call any web API", icon: <HttpIcon />, add: () => addStep((stepId, stepName) => ({ id: stepId, name: stepName, type: "http_request", config: { method: "GET", url: "", headers: {} } }), "http_request", "HTTP request") },
-    { label: "If / else", description: "Choose a path based on a condition", icon: <IfIcon />, add: () => addStep((stepId, stepName) => ({ id: stepId, name: stepName, type: "if", config: { left: "", operator: "equals", right: "" } }), "if_step", "If") },
-    { label: "Delay", description: "Wait for a set time before carrying on", icon: <DelayIcon />, add: () => addStep((stepId, stepName) => ({ id: stepId, name: stepName, type: "delay", config: { amount: 5, unit: "minutes" } }), "delay", "Delay") },
-    { label: "Approval", description: "Pause until a person approves or rejects", icon: <ApprovalIcon />, add: () => addStep((stepId, stepName) => ({ id: stepId, name: stepName, type: "approval", config: { message: "Please review this request.", timeoutHours: 24 } }), "approval", "Approval") },
-    { label: "Loop", description: "Repeat an action for each item in a list", icon: <LoopIcon />, add: () => addStep((stepId, stepName) => ({ id: stepId, name: stepName, type: "loop", config: { items: "", action: { type: "http_request", config: { method: "POST", url: "", headers: {} } } } }), "loop", "Loop") },
-  ].filter((item) => matchesSearch(item.label, item.description));
+  const allCoreSteps: PaletteEntry[] = [
+    { key: "core:http_request", label: "HTTP request", description: "Call any web API", icon: <HttpIcon />, baseId: "http_request", stepName: "HTTP request", make: (stepId, stepName) => ({ id: stepId, name: stepName, type: "http_request", config: { method: "GET", url: "", headers: {} } }) },
+    { key: "core:if", label: "If / else", description: "Choose a path based on a condition", icon: <IfIcon />, baseId: "if_step", stepName: "If", make: (stepId, stepName) => ({ id: stepId, name: stepName, type: "if", config: { left: "", operator: "equals", right: "" } }) },
+    { key: "core:delay", label: "Delay", description: "Wait for a set time before carrying on", icon: <DelayIcon />, baseId: "delay", stepName: "Delay", make: (stepId, stepName) => ({ id: stepId, name: stepName, type: "delay", config: { amount: 5, unit: "minutes" } }) },
+    { key: "core:approval", label: "Approval", description: "Pause until a person approves or rejects", icon: <ApprovalIcon />, baseId: "approval", stepName: "Approval", make: (stepId, stepName) => ({ id: stepId, name: stepName, type: "approval", config: { message: "Please review this request.", timeoutHours: 24 } }) },
+    { key: "core:loop", label: "Loop", description: "Repeat an action for each item in a list", icon: <LoopIcon />, baseId: "loop", stepName: "Loop", make: (stepId, stepName) => ({ id: stepId, name: stepName, type: "loop", config: { items: "", action: { type: "http_request", config: { method: "POST", url: "", headers: {} } } } }) },
+  ];
 
-  const connectorGroups = connectorList
-    .map((connector) => ({ connector, actions: connector.actions.filter((action) => matchesSearch(connector.name, humanize(action.id), action.description)) }))
-    .filter((group) => group.actions.length > 0);
+  const allConnectorGroups = connectorList.map((connector) => ({
+    connector,
+    entries: connector.actions.map((action): PaletteEntry => ({
+      key: `app:${connector.id}:${action.id}`,
+      label: humanize(action.id),
+      description: action.description,
+      icon: <ServiceLogo connector={connector.id} />,
+      baseId: `${connector.id}_${action.id}`,
+      stepName: humanize(action.id),
+      make: (stepId, stepName) => ({ id: stepId, name: stepName, type: "connector", config: { connector: connector.id, action: action.id, connectionId: (connections.data ?? []).find((item) => item.connector === connector.id)?.id ?? "", params: {} } }),
+    })),
+  }));
+
+  // Finds the entry a dragged step came from.
+  const paletteByKey = new Map([...allCoreSteps, ...allConnectorGroups.flatMap((group) => group.entries)].map((entry) => [entry.key, entry]));
+
+  const coreSteps = allCoreSteps.filter((entry) => matchesSearch(entry.label, entry.description));
+  const connectorGroups = allConnectorGroups
+    .map(({ connector, entries }) => ({ connector, entries: entries.filter((entry) => matchesSearch(connector.name, entry.label, entry.description)) }))
+    .filter((group) => group.entries.length > 0);
 
   return (
     <div className={`b-root ${view === "tile" ? "b-tile" : ""}`}>
@@ -326,25 +462,11 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
           </div>
           <div className="b-pal-scroll">
             {coreSteps.length > 0 && <div className="pal-h">CORE</div>}
-            {coreSteps.map((item) => (
-              <PaletteItem key={item.label} icon={item.icon} label={item.label} description={item.description} onClick={item.add} />
-            ))}
-            {connectorGroups.map(({ connector, actions }) => (
+            {coreSteps.map((entry) => <PaletteItem key={entry.key} entry={entry} onAdd={() => addStep(entry)} />)}
+            {connectorGroups.map(({ connector, entries }) => (
               <div key={connector.id}>
                 <div className="pal-h">{connector.name.toUpperCase()}</div>
-                {actions.map((action) => (
-                  <PaletteItem
-                    key={action.id}
-                    icon={<ServiceLogo connector={connector.id} />}
-                    label={humanize(action.id)}
-                    description={action.description}
-                    onClick={() => addStep(
-                      (stepId, stepName) => ({ id: stepId, name: stepName, type: "connector", config: { connector: connector.id, action: action.id, connectionId: (connections.data ?? []).find((item) => item.connector === connector.id)?.id ?? "", params: {} } }),
-                      `${connector.id}_${action.id}`,
-                      humanize(action.id),
-                    )}
-                  />
-                ))}
+                {entries.map((entry) => <PaletteItem key={entry.key} entry={entry} onAdd={() => addStep(entry)} />)}
               </div>
             ))}
             {coreSteps.length === 0 && connectorGroups.length === 0 && <p className="hint pal-none">No steps match your search.</p>}
@@ -362,7 +484,14 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
             onConnect={onConnect}
             isValidConnection={isValidConnection}
             onSelect={setSelectedId}
+            onNodeMenu={(nodeId, at) => setOpenMenu({ kind: "node", id: nodeId, at })}
+            onEdgeMenu={(edgeId, at) => setOpenMenu({ kind: "edge", id: edgeId, at })}
+            onDropStep={(paletteKey, position) => {
+              const entry = paletteByKey.get(paletteKey);
+              if (entry) addStep(entry, position);
+            }}
           />
+          {openMenu && <CanvasMenu at={openMenu.at} title={menuTitle(openMenu)} items={menuItems(openMenu)} onClose={() => setOpenMenu(null)} />}
           {liveRun && (
             <div className="hint-bar is-live" role="status">
               <StatusBadge status={liveRun.status} />

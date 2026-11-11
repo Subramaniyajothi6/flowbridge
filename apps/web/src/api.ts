@@ -1,4 +1,5 @@
 import type {
+  ActivityPage,
   Analytics,
   AuthStatus,
   Connection,
@@ -72,6 +73,7 @@ export const api = {
   notifications: () => request<Notifications>("/api/monitoring/notifications"),
   markNotificationsRead: () => request<void>("/api/monitoring/notifications/read", { method: "POST", body: {} }),
   overview: () => request<Overview>("/api/monitoring/overview"),
+  activity: (search?: string, before?: string) => request<ActivityPage>(`/api/monitoring/activity${query({ search, before })}`),
   analytics: (days: number) => request<Analytics>(`/api/monitoring/analytics?days=${days}`),
   health: () => request<Health>("/api/monitoring/health"),
 

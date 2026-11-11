@@ -3,10 +3,11 @@ import { api } from "../api.ts";
 import { ROLE_LABELS, useAuth } from "../auth.tsx";
 import { PageHead, Shell } from "../components/Shell.tsx";
 import { initials } from "../format.ts";
+import { ActivityLog } from "./ActivityPage.tsx";
 
 const timezones = ["Asia/Kolkata", "Asia/Singapore", "Asia/Dubai", "Europe/London", "Europe/Berlin", "America/New_York", "America/Los_Angeles", "UTC"];
 
-type Tab = "profile" | "password" | "workspace";
+type Tab = "profile" | "password" | "workspace" | "activity";
 type Message = { text: string; isError: boolean };
 
 function Feedback({ message }: { message: Message | null }) {
@@ -21,6 +22,7 @@ export function SettingsPage() {
     { id: "profile", label: "Profile" },
     { id: "password", label: "Password" },
     ...(can("settings.manage") ? [{ id: "workspace" as const, label: "Workspace" }] : []),
+    ...(can("runs.view") ? [{ id: "activity" as const, label: "Activity" }] : []),
   ];
 
   return (
@@ -35,6 +37,7 @@ export function SettingsPage() {
         {tab === "profile" && <ProfileForm />}
         {tab === "password" && <PasswordForm />}
         {tab === "workspace" && <WorkspaceForm />}
+        {tab === "activity" && <ActivityLog />}
       </div>
     </Shell>
   );

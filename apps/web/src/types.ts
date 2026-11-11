@@ -154,7 +154,7 @@ export type Connection = {
   usedBy: { id: string; name: string }[];
 };
 
-export type Role = "administrator" | "workflow_creator" | "business_user" | "technical_operator";
+export type Role = "administrator" | "workflow_builder" | "business_user";
 
 export type Member = {
   id: string;
@@ -183,15 +183,19 @@ export type Overview = {
   attention: { id: string; workflow_name: string; status: RunStatus; error: string | null; step_id: string | null; created_at: string; message: unknown }[];
   mostUsed: { id: string; name: string; runs: number }[];
   recent: { id: string; workflow_name: string; status: RunStatus; created_at: string }[];
-  activity: { id: string; actorName: string; description: string; createdAt: string }[];
+  activity: ActivityItem[];
 };
+
+export type ActivityItem = { id: string; actorName: string; description: string; createdAt: string };
+export type ActivityPage = { items: ActivityItem[]; hasMore: boolean };
 
 export type Analytics = {
   days: number;
   totals: RunTotals;
   daily: { day: string; succeeded: number; failed: number; average_seconds: number }[];
   byWorkflow: { id: string; name: string; runs: number; succeeded: number; failed: number; average_seconds: number }[];
-  failingSteps: { workflow_name: string; step_id: string; failures: number; last_error: string }[];
+  failureReasons: { reason: string; failures: number; example: string | null }[];
+  integrationUsage: { app: string; name: string; steps: number }[];
 };
 
 export type Health = {

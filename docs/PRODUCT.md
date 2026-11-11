@@ -8,10 +8,11 @@ Organisations run their daily work across disconnected applications. People move
 
 | Role | What they do |
 |------|--------------|
-| Administrator | Manages members, the workspace and integrations, and can do everything else |
-| Workflow Creator | Builds, tests and publishes workflows, and manages integrations |
-| Technical Operator | Investigates failures, sees step data, retries runs and checks system health. Sees the builder read-only |
-| Business User | Runs published workflows, follows their progress and makes approval decisions |
+| Administrator | Manages members, the workspace, new apps and logos, and can do everything else |
+| Workflow Builder | Builds, tests, publishes and looks after workflows. Manages integrations, investigates failures with full step data, retries runs and checks system health |
+| Business User | Runs published workflows, follows their progress, retries failed runs and makes approval decisions |
+
+The assignment listed four roles. Workflow Creator and Technical Operator were merged into Workflow Builder, following how Workato, Make and n8n organise their roles. The reasons are in decision 3.16.
 
 The full permissions are in section 3 of [DECISIONS.md](DECISIONS.md) and in `apps/server/src/auth/permissions.ts`.
 

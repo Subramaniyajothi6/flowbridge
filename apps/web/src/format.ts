@@ -10,6 +10,11 @@ export function formatDate(value: string | null): string {
   return new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: displayTimezone });
 }
 
+// "Tuesday, 10 November 2026".
+export function formatDay(value: string): string {
+  return new Date(value).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: displayTimezone });
+}
+
 export function formatDuration(start: string | null, end: string | null): string {
   if (!start || !end) return "-";
   const milliseconds = new Date(end).getTime() - new Date(start).getTime();

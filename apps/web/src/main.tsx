@@ -7,6 +7,7 @@ import "./app.css";
 import { AuthProvider, Protected, useAuth } from "./auth.tsx";
 import { BuilderPage } from "./builder/BuilderPage.tsx";
 import { LogosProvider } from "./logos.tsx";
+import { ActivityPage } from "./pages/ActivityPage.tsx";
 import { AnalyticsPage } from "./pages/AnalyticsPage.tsx";
 import { DocsPage } from "./pages/DocsPage.tsx";
 import { ExecutionDetailPage } from "./pages/ExecutionDetailPage.tsx";
@@ -43,7 +44,8 @@ createRoot(document.getElementById("root") as HTMLElement).render(
           <Route path="/executions" element={<Protected permission="runs.view"><ExecutionsPage /></Protected>} />
           <Route path="/executions/:id" element={<Protected permission="runs.view"><ExecutionDetailPage /></Protected>} />
           <Route path="/integrations" element={<Protected permission="integrations.view"><IntegrationsPage /></Protected>} />
-          <Route path="/analytics" element={<Protected permission="runs.view"><AnalyticsPage /></Protected>} />
+          <Route path="/activity" element={<Protected permission="runs.view"><ActivityPage /></Protected>} />
+          <Route path="/analytics"element={<Protected permission="runs.view"><AnalyticsPage /></Protected>} />
           <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
           <Route path="/team" element={<Protected permission="members.manage"><TeamPage /></Protected>} />
           <Route path="*" element={<UnknownAddress />} />

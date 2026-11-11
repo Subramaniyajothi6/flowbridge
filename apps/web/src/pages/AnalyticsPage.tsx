@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api.ts";
 import { PageHead, Shell } from "../components/Shell.tsx";
+import { HttpIcon, ServiceLogo } from "../components/StepIcon.tsx";
 import { formatNumber, formatPercent, formatSeconds } from "../format.ts";
 import type { Analytics } from "../types.ts";
 import { useLoad } from "../useLoad.ts";
@@ -63,9 +64,9 @@ export function AnalyticsPage() {
               <div className="card-b col">
                 {showTable ? <TrendTable series={series} /> : (
                   <>
-                    <DayBars title="Successful runs per day" series={series} valueOf={(day) => day.succeeded} format={formatNumber} />
-                    <DayBars title="Failed runs per day" series={series} valueOf={(day) => day.failed} format={formatNumber} />
-                    <DayBars title="Average duration per day" series={series} valueOf={(day) => day.average_seconds} format={formatSeconds} />
+                    <DayBars title="Successful runs per day" tone="tall" series={series} valueOf={(day) => day.succeeded} format={formatNumber} />
+                    <DayBars title="Failed runs per day" tone="tone-fail" series={series} valueOf={(day) => day.failed} format={formatNumber} />
+                    <DayBars title="Average duration per day" tone="tone-time" series={series} valueOf={(day) => day.average_seconds} format={formatSeconds} />
                     <div className="row between small dim num"><span>{shortDate(series[0].day)}</span><span>{shortDate(series[series.length - 1].day)}</span></div>
                   </>
                 )}
@@ -78,14 +79,14 @@ export function AnalyticsPage() {
                 {data.byWorkflow.length === 0 ? <p className="card-b muted">No live runs in this period.</p> : (
                   <div className="tbl-wrap tbl-round">
                     <table className="tbl">
-                      <thead><tr><th>Workflow</th><th className="r">Runs</th><th className="r">Success</th><th className="r hide-m">Failed</th><th className="r hide-m">Average</th></tr></thead>
+                      <thead><tr><th>Workflow</th><th className="r">Runs</th><th className="r">Success</th><th className="r hide-m">Failure</th><th className="r hide-m">Avg. duration</th></tr></thead>
                       <tbody>
                         {data.byWorkflow.map((workflow) => (
                           <tr key={workflow.id}>
                             <td className="strong">{workflow.name}</td>
                             <td className="r num">{formatNumber(workflow.runs)}</td>
                             <td className="r num">{formatPercent(workflow.succeeded, workflow.succeeded + workflow.failed)}</td>
-                            <td className="r num hide-m">{formatNumber(workflow.failed)}</td>
+                            <td className="r num hide-m">{formatPercent(workflow.failed, workflow.succeeded + workflow.failed)}</td>
                             <td className="r num hide-m">{formatSeconds(workflow.average_seconds)}</td>
                           </tr>
                         ))}
@@ -96,22 +97,43 @@ export function AnalyticsPage() {
               </section>
 
               <section className="card">
-                <div className="card-h"><h2 className="card-t">Steps that fail most</h2></div>
-                <div className="card-b col" style={{ gap: 10 }}>
-                  {data.failingSteps.length === 0 && <p className="muted">No failed steps in this period.</p>}
-                  {data.failingSteps.map((step) => (
-                    <div key={`${step.workflow_name}:${step.step_id}`}>
-                      <div className="row between">
-                        <span className="strong trunc">{step.step_id}</span>
-                        <span className="num small muted">{formatNumber(step.failures)}</span>
+                <div className="card-h"><h2 className="card-t">Why runs failed</h2></div>
+                <div className="card-b col" style={{ gap: 12 }}>
+                  {data.failureReasons.length === 0 && <p className="muted">No failed steps in this period.</p>}
+                  {data.failureReasons.map((item) => (
+                    <div key={item.reason} title={item.example ? `For example: ${item.example}` : undefined}>
+                      <div className="row between small">
+                        <span className="strong trunc">{item.reason}</span>
+                        <span className="num strong">{formatNumber(item.failures)}</span>
                       </div>
-                      <div className="small muted trunc">{step.workflow_name}</div>
-                      <div className="small dim trunc" title={step.last_error}>{step.last_error}</div>
+                      <Meter value={item.failures} peak={data.failureReasons[0].failures} tone="tone-fail" />
                     </div>
                   ))}
                 </div>
               </section>
             </div>
+
+            <section className="card">
+              <div className="card-h"><h2 className="card-t">Integration usage</h2><span className="small dim">Steps run per app</span></div>
+              <div className="card-b">
+                {data.integrationUsage.length === 0 ? <p className="muted">No app steps ran in this period.</p> : (
+                  <div className="usage-grid">
+                    {data.integrationUsage.map((item) => (
+                      <div className="usage-item" key={item.app}>
+                        {item.app === "http_request" ? <HttpIcon /> : <ServiceLogo connector={item.app} />}
+                        <div className="grow" style={{ minWidth: 0 }}>
+                          <div className="row between small">
+                            <span className="trunc">{item.name}</span>
+                            <span className="num strong">{formatNumber(item.steps)}</span>
+                          </div>
+                          <Meter value={item.steps} peak={data.integrationUsage[0].steps} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
           </>
         )}
       </div>
@@ -129,14 +151,23 @@ function Stat({ label, value, detail }: { label: string; value: string; detail: 
   );
 }
 
+// A horizontal bar showing a value against the largest one in its list.
+function Meter({ value, peak, tone = "" }: { value: number; peak: number; tone?: string }) {
+  return (
+    <div className={`meter ${tone}`} aria-hidden="true">
+      <i style={{ width: `${peak > 0 ? Math.max(3, (value / peak) * 100) : 0}%` }} />
+    </div>
+  );
+}
+
 // One small chart for each measure, because they have very different scales.
-function DayBars({ title, series, valueOf, format }: { title: string; series: Day[]; valueOf: (day: Day) => number; format: (value: number) => string }) {
+function DayBars({ title, tone, series, valueOf, format }: { title: string; tone: string; series: Day[]; valueOf: (day: Day) => number; format: (value: number) => string }) {
   const peak = Math.max(...series.map(valueOf), 0);
 
   return (
     <div>
       <div className="row between small"><span className="muted">{title}</span><span className="dim num">Peak {format(peak)}</span></div>
-      <div className="bars day-bars" role="img" aria-label={`${title}. Peak ${format(peak)}. Use View as table for each value.`}>
+      <div className={`bars day-bars ${tone}`} role="img" aria-label={`${title}. Peak ${format(peak)}. Use View as table for each value.`}>
         {series.map((day) => {
           const value = valueOf(day);
           return (

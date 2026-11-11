@@ -39,7 +39,7 @@ To create one demonstration account for each role instead:
 SEED_PASSWORD=choose-a-long-password npm run db:seed --workspace apps/server
 ```
 
-The accounts are `jonah@` (Administrator), `priya@` (Workflow Creator), `rahul@` (Technical Operator) and `lena@` (Business User), all at `meridianlogistics.example`. Running it again resets their passwords.
+The accounts are `jonah@` (Administrator), `priya@` and `rahul@` (Workflow Builder) and `lena@` (Business User), all at `meridianlogistics.example`. Running it again resets their passwords.
 
 ## Deployment
 

@@ -9,7 +9,7 @@ import { sessions, users, workspace } from "../db/schema.ts";
 import { toPublicUser } from "./auth.ts";
 
 const idParams = z.object({ id: z.uuid() });
-const role = z.enum(["administrator", "workflow_creator", "business_user", "technical_operator"]);
+const role = z.enum(["administrator", "workflow_builder", "business_user"]);
 const addMemberBody = z.object({ name: z.string().trim().min(1).max(100), email: z.string().trim().toLowerCase().email().max(200), role });
 const updateMemberBody = z.object({ role: role.optional(), isActive: z.boolean().optional() });
 const workspaceBody = z.object({ name: z.string().trim().min(1).max(100), monthlyRunLimit: z.number().int().min(1).max(1_000_000) });

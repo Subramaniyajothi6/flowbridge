@@ -49,12 +49,11 @@ const topics: Topic[] = [
   },
   {
     title: "Team and roles",
-    intro: "Each person has one of four roles.",
+    intro: "Each person has one of three roles.",
     points: [
-      { title: "Administrator", text: "Everything, including adding members and changing workspace settings." },
-      { title: "Workflow Creator", text: "Builds, tests and publishes workflows, and manages integrations." },
-      { title: "Technical Operator", text: "Investigates failures, sees step data and retries runs. Sees the builder read-only." },
-      { title: "Business User", text: "Runs published workflows, follows their progress and makes approval decisions." },
+      { title: "Administrator", text: "Everything, including adding members, changing workspace settings and adding new apps." },
+      { title: "Workflow Builder", text: "Builds, tests, publishes and looks after workflows. Manages integrations, investigates failures with full step data and checks system health." },
+      { title: "Business User", text: "Runs published workflows, follows their progress, retries failed runs and makes approval decisions." },
     ],
   },
 ];

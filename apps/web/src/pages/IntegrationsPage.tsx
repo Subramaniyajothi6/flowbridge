@@ -38,7 +38,7 @@ export function IntegrationsPage() {
   const connectors = useLoad(api.listConnectors);
   const connections = useLoad(api.listConnections);
 
-  // Technical Operators mostly check existing accounts, so they start on that tab.
+  // Anyone who can only check existing accounts starts on that tab.
   const [tab, setTab] = useState<"directory" | "accounts">(can("integrations.manage") ? "directory" : "accounts");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");

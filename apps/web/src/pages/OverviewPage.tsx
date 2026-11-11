@@ -85,7 +85,7 @@ export function OverviewPage() {
             </div>
 
             <section className="card">
-              <div className="card-h"><h2 className="card-t">Recent activity</h2></div>
+              <div className="card-h"><h2 className="card-t">Recent activity</h2>{data.activity.length > 0 && <Link className="small strong" to="/activity">View all</Link>}</div>
               {data.activity.length === 0 && <p className="card-b muted">Nothing to show yet.</p>}
               {data.activity.map((item) => (
                 <div className="activity-row" key={item.id}>

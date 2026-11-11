@@ -46,9 +46,10 @@ Tested on 2026-11-10 against the real Neon database and the running application.
 | API, connections or runs without signing in | Refused |
 | Wrong password | Refused, with no session created |
 | Registering when a workspace exists | Refused |
-| Business User or Technical Operator creating or publishing | Refused |
+| Business User creating or publishing | Refused |
 | Business User viewing step data | Hidden on the server |
-| Business User or Technical Operator managing connections | Refused |
+| Business User managing connections | Refused |
+| Each role's exact permissions (automated check, 2026-11-11) | Match the three-role table in DECISIONS.md section 3 |
 | Member and settings changes by non-Administrators | Refused |
 | Removing or demoting the last Administrator | Refused |
 | Deactivating a member | Signed out at once |

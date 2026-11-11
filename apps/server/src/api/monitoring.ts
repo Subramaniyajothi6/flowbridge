@@ -1,14 +1,46 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, lt, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { hasPermission } from "../auth/permissions.ts";
 import { currentUser, requirePermission } from "../auth/sessions.ts";
 import { db } from "../db/client.ts";
 import { activity, connections, users, workspace } from "../db/schema.ts";
+import { getConnector } from "../connectors/registry.ts";
 import { ADVANCE_RUN_QUEUE, boss } from "../engine/queue.ts";
+import { type FailedGroup, groupFailures } from "./failure-reasons.ts";
 import { countLiveRunsThisMonth } from "../engine/create-run.ts";
 
 const analyticsQuery = z.object({ days: z.coerce.number().int().refine((days) => [7, 14, 30].includes(days)).default(30) });
+
+const ACTIVITY_PAGE_SIZE = 50;
+const activityQuery = z.object({
+  // The time of the last entry already shown. The next page starts after it.
+  before: z.iso.datetime({ offset: true }).optional(),
+  search: z.string().trim().max(100).optional(),
+});
+
+// Each step run, next to the saved definition of its step, so its type and app are known.
+const stepsWithDefinitions = sql`step_runs s
+  join runs r on r.id = s.run_id
+  join workflow_versions v on v.id = r.version_id
+  join lateral jsonb_array_elements(v.definition -> 'steps') step on step ->> 'id' = s.step_id`;
+
+// The app a step used. Web requests count as "HTTP request". Logic steps such as If use no app.
+const appOfStep = sql`case step ->> 'type'
+  when 'connector' then step -> 'config' ->> 'connector'
+  when 'http_request' then 'http_request'
+  when 'loop' then coalesce(step -> 'config' -> 'action' -> 'config' ->> 'connector', 'http_request')
+end`;
+
+function appName(app: string): string {
+  if (app === "http_request") return "HTTP request";
+  return getConnector(app)?.name ?? app;
+}
+
+// % and _ have special meanings in a LIKE pattern, so they are matched as ordinary characters.
+function likePattern(text: string): string {
+  return `%${text.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+}
 
 // Only live runs are counted everywhere on this page, so testing never skews the numbers.
 async function rows<T>(query: ReturnType<typeof sql>): Promise<T[]> {
@@ -154,6 +186,26 @@ export function registerMonitoringRoutes(app: FastifyInstance): void {
     };
   });
 
+  // The full activity history, newest first, one page at a time.
+  app.get("/api/monitoring/activity", { preHandler: requirePermission("runs.view") }, async (request) => {
+    const { before, search } = activityQuery.parse(request.query);
+    const isAdministrator = hasPermission(currentUser(request).role, "members.manage");
+
+    const items = await db
+      .select({ id: activity.id, actorName: activity.actorName, description: activity.description, createdAt: activity.createdAt })
+      .from(activity)
+      .where(and(
+        isAdministrator ? undefined : eq(activity.isAdminOnly, false),
+        before ? lt(activity.createdAt, new Date(before)) : undefined,
+        search ? or(ilike(activity.actorName, likePattern(search)), ilike(activity.description, likePattern(search))) : undefined,
+      ))
+      .orderBy(desc(activity.createdAt))
+      // One extra row shows whether there is another page, without a second query.
+      .limit(ACTIVITY_PAGE_SIZE + 1);
+
+    return { items: items.slice(0, ACTIVITY_PAGE_SIZE), hasMore: items.length > ACTIVITY_PAGE_SIZE };
+  });
+
   app.get("/api/monitoring/analytics", { preHandler: requirePermission("runs.view") }, async (request) => {
     const { days } = analyticsQuery.parse(request.query);
 
@@ -175,15 +227,26 @@ export function registerMonitoringRoutes(app: FastifyInstance): void {
       where r.mode = 'live' and r.created_at >= now() - make_interval(days => ${days})
       group by w.id, w.name order by runs desc limit 20`);
 
-    const failingSteps = await rows<{ workflow_name: string; step_id: string; failures: number; last_error: string }>(sql`
-      select w.name as workflow_name, s.step_id, count(*)::int as failures, max(s.error) as last_error
-      from step_runs s
-      join runs r on r.id = s.run_id
-      join workflows w on w.id = r.workflow_id
+    const failedGroups = await rows<FailedGroup>(sql`
+      select ${appOfStep} as app, s.error, count(*)::int as failures
+      from ${stepsWithDefinitions}
       where s.status = 'failed' and r.mode = 'live' and r.created_at >= now() - make_interval(days => ${days})
-      group by w.name, s.step_id order by failures desc limit 10`);
+      group by 1, 2`);
 
-    return { days, totals: await runTotals(days), daily, byWorkflow, failingSteps };
+    const integrationUsage = await rows<{ app: string; steps: number }>(sql`
+      select ${appOfStep} as app, count(*)::int as steps
+      from ${stepsWithDefinitions}
+      where s.status in ('succeeded', 'failed') and r.mode = 'live' and r.created_at >= now() - make_interval(days => ${days})
+      group by 1 having ${appOfStep} is not null order by steps desc limit 12`);
+
+    return {
+      days,
+      totals: await runTotals(days),
+      daily,
+      byWorkflow,
+      failureReasons: groupFailures(failedGroups, appName),
+      integrationUsage: integrationUsage.map((row) => ({ ...row, name: appName(row.app) })),
+    };
   });
 
   // For investigating problems with the platform itself.

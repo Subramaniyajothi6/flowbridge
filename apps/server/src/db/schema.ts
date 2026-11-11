@@ -5,7 +5,7 @@ import type { PollConfig, PollCursor, ScheduleConfig } from "../triggers/definit
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
-export type Role = "administrator" | "workflow_creator" | "business_user" | "technical_operator";
+export type Role = "administrator" | "workflow_builder" | "business_user";
 
 // There is one workspace per installation, so this table has a single row.
 export const workspace = pgTable("workspace", {

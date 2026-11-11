@@ -34,21 +34,24 @@ Dates are in YYYY-MM-DD format.
 
 | # | Decision | Why |
 |---|----------|-----|
-| 3.1 | Four roles: Administrator, Workflow Creator, Business User, Technical Operator. | These are the roles named in the assignment. |
+| 3.1 | ~~Four roles: Administrator, Workflow Creator, Business User, Technical Operator.~~ Replaced by 3.16. | These are the roles named in the assignment. |
 | 3.2 | Create, edit and publish workflows: Administrator and Workflow Creator. | They are the people responsible for how a process is built. |
-| 3.3 | Retry runs and see step data: Administrator, Workflow Creator and Technical Operator. | Operators need these to investigate failures. |
-| 3.4 | Connect and manage integrations: Administrator and Workflow Creator. View and test them: those two and Technical Operator. | Connections hold access to outside systems, so changing them is limited. |
+| 3.3 | ~~Retry runs and see step data: Administrator, Workflow Creator and Technical Operator.~~ Replaced by 3.17. | Operators need these to investigate failures. |
+| 3.4 | ~~Connect and manage integrations: Administrator and Workflow Creator. View and test them: those two and Technical Operator.~~ Replaced by 3.17. | Connections hold access to outside systems, so changing them is limited. |
 | 3.5 | Members and settings: Administrator only. | These affect the whole workspace. |
-| 3.6 | Run available workflows: all four roles. | Running processes is the Business User's whole purpose. |
-| 3.7 | Technical Operator sees the Builder read-only. Business User has no Builder, Templates or Integrations. | Each role only sees what it needs. |
+| 3.6 | Run available workflows: every role. | Running processes is the Business User's whole purpose. |
+| 3.7 | ~~Technical Operator sees the Builder read-only.~~ Business User has no Builder, Templates or Integrations. | Each role only sees what it needs. |
 | 3.8 | The permissions matrix lives in the documentation and report, not in the admin screen. | It is reference material, not something an administrator edits. |
 | 3.9 | One workspace per installation. Only the first person can register, and Administrators add everyone else (2026-11-10). | Open registration on a public site would let a stranger reach the workspace's connected accounts. |
 | 3.10 | Passwords use Node's built-in scrypt. Sessions are random tokens in an HttpOnly cookie, stored only as hashes (2026-11-10). | No extra packages, and a leaked database cannot be used to sign in. |
 | 3.11 | New members get a one-time temporary password from their Administrator (2026-11-10). | There is no free email service in the project. |
-| 3.12 | Approvals can be decided by Administrators, Workflow Creators and Business Users (2026-11-10). | Business Users use the automations and are the likely approvers. Technical Operators investigate faults instead. |
+| 3.12 | Approvals can be decided by every role (2026-11-10, updated by 3.16). | Business Users use the automations and are the likely approvers. |
 | 3.13 | The real Sign in page does not list test accounts (2026-11-10). | The prototype listed them for reviewers, but a real sign-in page must not show a password. |
 | 3.14 | Activity about members, passwords, workspace settings and logos is shown only to Administrators (2026-11-11). | Other roles do not need to know who had their password reset or their access changed. |
-| 3.15 | Technical Operators open Integrations on the Connected accounts tab, and can only test accounts there (2026-11-11). | Checking which accounts work and which workflows use them is their job. Changing them is not. |
+| 3.15 | ~~Technical Operators open Integrations on the Connected accounts tab, and can only test accounts there (2026-11-11).~~ No longer applies after 3.16. | Checking which accounts work and which workflows use them is their job. Changing them is not. |
+| 3.16 | Three roles instead of four: Administrator, Workflow Builder and Business User. Workflow Creator and Technical Operator are merged into Workflow Builder, and existing accounts were moved to it (2026-11-11). | Real platforms split people this way: Workato uses Admin, Analyst (builder) and Operator, Make uses Admin, Member and Operator, and n8n uses Owner or Admin, Member and Viewer. In a small team the person who builds a workflow is also the one who fixes it, so a separate read-only operator role added little. |
+| 3.17 | Workflow Builder has everything a Workflow Creator had: build, test, publish, connect accounts, see step data, retry, approve and see system health. Members, workspace settings, adding apps and logos stay with the Administrator (2026-11-11). | It covers everything both merged roles could do, so nobody lost access they needed. |
+| 3.18 | Business Users can retry a failed run (2026-11-11). | Make and Workato operators can restart automations without editing them. The person who uses the process can recover it without waiting for a builder. Step data stays hidden from them. |
 
 ## 4. Design
 

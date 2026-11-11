@@ -8,6 +8,16 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Log (newest first)
 
+### 2026-11-11, laptop
+- **Three roles instead of four:** Administrator, Workflow Builder and Business User. Workflow Creator and Technical Operator were merged into Workflow Builder after comparing Workato, Make and n8n (decisions 3.16 to 3.18). Priya and Rahul are now Workflow Builders in the shared database. Business Users can now retry failed runs. Database update 0011 is applied.
+- New **Activity** page with the full history, search, day headings and Show more. Reached from **View all** on Overview and from an Activity tab in Settings.
+- **Analytics** matches the design: Integration usage card, "Why runs failed" grouped into plain reasons, red failed-runs chart, taller successful-runs chart, and Failure as a percentage. Bars stay neutral grey, not orange.
+- **Builder:** right-click a card (Open settings, Duplicate, Remove its connections, Delete step) or a connection (Delete, or switch between success and error, True and False, Approved and Rejected). Steps can be dragged from the left panel onto the canvas. Connections are easier: bigger dots, snapping when let go near a dot, and connecting when let go anywhere on a card.
+- **Crash fix:** a dropped database connection no longer stops the whole server.
+- **Jira proven:** the "Jira test" workflow (still a draft) took a customer problem, created `SCRUM-9` in Jira and posted the key in Slack. `SCRUM-6`, `SCRUM-7` and `SCRUM-8` are leftover tests to delete in Jira.
+- The GitHub repository is now public. Its whole history was checked for secrets first.
+- 144 automated checks, the type check and the build pass. **Not yet checked by eye:** the builder right-click menus, drag and drop and easier connecting, the Activity page and the new Analytics cards.
+
 ### 2026-11-11
 - The notification bell now opens a Notifications panel instead of going to Overview. Read status is saved per person.
 - Overview: Recent activity is full width, one entry per line, and the cards above it line up in two rows.
@@ -52,18 +62,19 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 | 3. Connections and integrations | Done, proven with real accounts |
 | 4. Visual builder and execution screens | Done, reviewed against the prototype |
 | 5. Pauses and recovery: delay, approval, loops, retries, error paths, retry from failed step | Done and tested |
-| 6. Sign-in, the four roles, draft and publish, monitoring, usage limits | Done and tested |
+| 6. Sign-in, the three roles, draft and publish, monitoring, usage limits | Done and tested |
 | 7. Public Home page, Sign in and remaining designed pages, deployment, testing report | Built. Going live is still to do |
 
 ## Next
 
-1. Finish the manual check: build, publish and run, failure and retry, approval. The Integrations Test buttons and the role checks were done on 2026-11-11.
-2. Use the connected Jira app in a workflow ("Create issue" in project `SCRUM`), and walk through adding GitHub with Add app.
-3. Deploy on Render, following the Deployment section of `README.md`.
-4. Before sharing the address, change the demo password by running the seed command with a new `SEED_PASSWORD`.
-5. Add the public address to the Google OAuth redirect addresses, then reconnect Gmail and Sheets on the live site.
-6. Copy `reports` and `research_notes` into `docs`, and make the repository public or share access.
-7. Add the deployment link to the README and the final demonstration notes, then rehearse the demonstration.
+1. Check by eye in the builder: right-click a card and a connection, drag a step from the left panel, and connect by letting go on a card. Then look at Activity and Analytics.
+2. Run the seed command with the demo password so Lena (Business User) can sign in again, then check the app as each of the three roles.
+3. Finish the manual check: publish and run, failure and retry, approval. Publish "Jira test" if it is wanted in the demo.
+4. Deploy on Render, following the Deployment section of `README.md`.
+5. Before sharing the address, change the demo password by running the seed command with a new `SEED_PASSWORD`.
+6. Add the public address to the Google OAuth redirect addresses, then reconnect Gmail and Sheets on the live site. Google connections expire around 2026-11-16.
+7. Copy `reports` and `research_notes` into `docs`.
+8. Add the deployment link to the README and the final demonstration notes, then rehearse the demonstration.
 
 ## Setting up a new machine
 
@@ -125,15 +136,15 @@ Outside this repository, in the laptop's `D:\Adz4\FlowBridge Project` folder:
 - No gradients on buttons or the scroll progress line, and no gradient sidebar. Other approved gradients stay. Change only what was asked for.
 - Background placements: Horizon glow on Sign in, the Create workspace panel and the Home closing section. Fine grid on the Home failure section and the replay panel. Light grid at the top of Docs. Grain and spotlight on No access. Flow lines in empty states. Busy work pages stay plain.
 
-**Roles (from the assignment)**
-- Administrator, Workflow Creator, Business User, Technical Operator. The permissions are listed in section 3 of `docs/DECISIONS.md`.
+**Roles**
+- Three roles: Administrator, Workflow Builder and Business User. The assignment listed four, and Workflow Creator and Technical Operator were merged on 2026-11-11 after comparing Workato, Make and n8n. The permissions are listed in section 3 of `docs/DECISIONS.md` and in `apps/server/src/auth/permissions.ts`.
 
 ## Things to remember
 
 - Google connections expire 7 days after connecting, while the Google project is in Testing status. The current ones expire around 2026-11-16. Reconnect them on the Integrations page shortly before any demo.
 - Stripe is a sandbox registered as a United States account only because Stripe is invitation-only in India. Keep it in test mode and never activate it.
 - The Render free host sleeps after 15 minutes idle. Open the site a few minutes before a demonstration.
-- Demo accounts: jonah@ (Administrator), priya@ (Workflow Creator), rahul@ (Technical Operator), lena@ (Business User), all at meridianlogistics.example.
+- Demo accounts: jonah@ (Administrator), priya@ and rahul@ (Workflow Builder), lena@ (Business User), all at meridianlogistics.example.
 - The workflow "Welcome new customers" is in the workspace and has passed a test run. It uses a spreadsheet with Customers and Tasks tabs.
 - If `npm start` fails with `getaddrinfo ENOTFOUND` for the Neon address, the network's DNS is refusing it. Setting the Wi-Fi DNS to 8.8.8.8 and 8.8.4.4 fixed it on the laptop.
 - To test a workflow that uses webhook data, enter test data as `{ "body": { "name": "Asha", "email": "you@example.com", "company": "Acme" } }`.

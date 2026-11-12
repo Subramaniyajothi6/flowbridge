@@ -12,6 +12,7 @@ type CreateRunInput = {
   retryOfRunId?: string;
   mode?: RunMode;
   startedBy?: string;
+  startedById?: string;
 };
 
 export class RunLimitError extends Error {

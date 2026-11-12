@@ -58,6 +58,8 @@ export type WorkflowSummary = Omit<Workflow, "webhookToken"> & {
   versionNumber: number | null;
   stepCount: number;
   stepNames: string[];
+  // The details the published version reads from its start data, asked for by the Run form.
+  inputFields: { path: string; name: string }[];
   lastRun: { status: RunStatus; createdAt: string } | null;
   lastTestRun: { status: RunStatus; createdAt: string } | null;
   last30Days: { total: number; succeeded: number; failed: number };
@@ -110,6 +112,8 @@ export type StepRun = {
 };
 
 export type RunDetail = RunSummary & {
+  // When the run's data was removed after the workspace's history period, or null.
+  dataRemovedAt: string | null;
   retryOfRunId: string | null;
   triggerData: unknown;
   versionNumber: number | null;
@@ -187,9 +191,23 @@ export type Member = {
 export type Session = { user: Member; permissions: string[]; workspaceName: string };
 export type AuthStatus = { workspaceExists: boolean; session: Session | null };
 export type Usage = { used: number; limit: number; needsAttention: number };
-export type NotificationItem = { id: string; kind: "failed" | "approval" | "retry" | "connection"; text: string; detail: string | null; happenedAt: string; href: string };
+export type NotificationItem = { id: string; kind: "failed" | "approval" | "retry" | "connection" | "digest" | "review" | "invite"; text: string; detail: string | null; happenedAt: string; href: string };
+
+export type NotificationEvent = "fail" | "digest" | "token" | "review" | "invite";
+export type NotificationPreference = { event: NotificationEvent; label: string; description: string; email: boolean; inApp: boolean };
+export type NotificationSettings = { emailAddress: string; canReceiveEmail: boolean; events: NotificationPreference[] };
 export type Notifications = { items: NotificationItem[]; unread: number };
-export type Workspace = { id: number; name: string; monthlyRunLimit: number };
+export type Workspace = {
+  id: number;
+  name: string;
+  monthlyRunLimit: number;
+  // 0 keeps run data forever.
+  runHistoryDays: number;
+  stepRetryAttempts: number;
+  // Live runs so far this month, and when that count starts again.
+  used: number;
+  resetsAt: string;
+};
 
 export type RunTotals = { total: number; succeeded: number; failed: number; active: number; average_seconds: number };
 
@@ -202,7 +220,42 @@ export type Overview = {
   activity: ActivityItem[];
 };
 
-export type ActivityItem = { id: string; actorName: string; description: string; createdAt: string };
+// The Overview for people who run workflows rather than build them.
+export type MyOverview = {
+  // What happened to today's live runs, one sentence each. On a quiet day, the latest runs instead.
+  story: { id: string; text: string; tone: "ok" | "err" | "warn" | "run"; at: string; startedByYou: boolean }[];
+  storyIsToday: boolean;
+  approvals: { runId: string; stepId: string; workflowName: string; stepName: string | null; message: string; waitingSince: string; decideBy: string | null }[];
+  failures: { id: string; workflowName: string; createdAt: string; stepName: string | null; reason: string; retryHelps: boolean }[];
+  failureCount: number;
+  myWeek: { succeeded: number; failed: number; active: number };
+};
+
+export type TemplateCategory ="Sales" | "Finance" | "Support" | "Operations";
+
+// A template someone in the workspace made from one of their workflows.
+export type TeamTemplate = {
+  id: string;
+  name: string;
+  category: TemplateCategory;
+  description: string;
+  definition: Definition;
+  createdById: string | null;
+  createdByName: string;
+  createdAt: string;
+};
+
+export type AdminTask ={ kind: "connection" | "limit" | "member" | "usage"; title: string; detail: string; action: string; href: string };
+
+export type AdminOverview = {
+  members: { total: number; notSignedIn: number };
+  connections: { total: number; needAttention: number };
+  runs: { used: number; limit: number };
+  team: { role: Role; people: { name: string; hasSignedIn: boolean }[] }[];
+  tasks: AdminTask[];
+};
+
+export type ActivityItem ={ id: string; actorName: string; description: string; createdAt: string };
 export type ActivityPage = { items: ActivityItem[]; total: number; pageSize: number };
 
 export type Analytics = {

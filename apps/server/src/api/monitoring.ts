@@ -1,10 +1,11 @@
-import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { activityVisibleTo } from "../auth/activity.ts";
 import { hasPermission } from "../auth/permissions.ts";
 import { currentUser, requirePermission } from "../auth/sessions.ts";
 import { db } from "../db/client.ts";
-import { activity, connections, users, workspace } from "../db/schema.ts";
+import { activity, connections, notifications, users, workspace, type NotificationEvent } from "../db/schema.ts";
 import { getConnector } from "../connectors/registry.ts";
 import { ADVANCE_RUN_QUEUE, boss } from "../engine/queue.ts";
 import { type FailedGroup, groupFailures } from "./failure-reasons.ts";
@@ -20,19 +21,19 @@ const activityQuery = z.object({
 });
 
 // Each step run, next to the saved definition of its step, so its type and app are known.
-const stepsWithDefinitions = sql`step_runs s
+export const stepsWithDefinitions = sql`step_runs s
   join runs r on r.id = s.run_id
   join workflow_versions v on v.id = r.version_id
   join lateral jsonb_array_elements(v.definition -> 'steps') step on step ->> 'id' = s.step_id`;
 
 // The app a step used. Web requests count as "HTTP request". Logic steps such as If use no app.
-const appOfStep = sql`case step ->> 'type'
+export const appOfStep = sql`case step ->> 'type'
   when 'connector' then step -> 'config' ->> 'connector'
   when 'http_request' then 'http_request'
   when 'loop' then coalesce(step -> 'config' -> 'action' -> 'config' ->> 'connector', 'http_request')
 end`;
 
-function appName(app: string): string {
+export function appName(app: string): string {
   if (app === "http_request") return "HTTP request";
   return getConnector(app)?.name ?? app;
 }
@@ -77,7 +78,10 @@ async function runsNeedingAttention() {
     limit 8`);
 }
 
-type Notification = { id: string; kind: "failed" | "approval" | "retry" | "connection"; text: string; detail: string | null; happenedAt: string; href: string };
+type BellKind = "failed" | "approval" | "retry" | "connection" | "digest" | "review" | "invite";
+type Notification = { id: string; kind: BellKind; text: string; detail: string | null; happenedAt: string; href: string };
+
+const BELL_KIND: Record<NotificationEvent, BellKind> = { fail: "failed", digest: "digest", token: "connection", review: "review", invite: "invite" };
 
 type NotifiableRun = { id: string; workflow_name: string; status: string; error: string | null; happened_at: string; wait_kind: string | null; step_name: string | null };
 
@@ -111,28 +115,22 @@ async function runNotifications(): Promise<Notification[]> {
   });
 }
 
-async function connectionNotifications(): Promise<Notification[]> {
-  const broken = await db
-    .select({ id: connections.id, name: connections.name, updatedAt: connections.updatedAt })
-    .from(connections)
-    .where(eq(connections.status, "needs_reconnect"));
-
-  return broken.map((connection) => ({
-    id: connection.id,
-    kind: "connection",
-    text: `${connection.name} needs connecting again`,
-    detail: null,
-    happenedAt: connection.updatedAt.toISOString(),
-    href: "/integrations",
-  }));
-}
-
 export function registerMonitoringRoutes(app: FastifyInstance): void {
+  // The bell: approvals and retries happening now, plus what this person chose to see "In app" in Settings.
   app.get("/api/monitoring/notifications", async (request) => {
     const user = currentUser(request);
-    const canSeeConnections = hasPermission(user.role, "integrations.view");
-    const items = [...(await runNotifications()), ...(canSeeConnections ? await connectionNotifications() : [])]
-      .sort((first, second) => new Date(second.happenedAt).getTime() - new Date(first.happenedAt).getTime());
+    const waiting = (await runNotifications()).filter((item) => item.kind !== "failed");
+    const stored = await db
+      .select({ id: notifications.id, event: notifications.event, title: notifications.title, detail: notifications.detail, href: notifications.href, createdAt: notifications.createdAt })
+      .from(notifications)
+      .where(and(eq(notifications.userId, user.id), eq(notifications.inApp, true), gte(notifications.createdAt, sql`now() - interval '30 days'`)))
+      .orderBy(desc(notifications.createdAt))
+      .limit(20);
+
+    const items = [
+      ...waiting,
+      ...stored.map((item) => ({ id: item.id, kind: BELL_KIND[item.event], text: item.title, detail: item.detail || null, happenedAt: item.createdAt.toISOString(), href: item.href })),
+    ].sort((first, second) => new Date(second.happenedAt).getTime() - new Date(first.happenedAt).getTime());
 
     const readUpTo = user.notificationsReadAt?.getTime() ?? 0;
     return { items, unread: items.filter((item) => new Date(item.happenedAt).getTime() > readUpTo).length };
@@ -151,14 +149,15 @@ export function registerMonitoringRoutes(app: FastifyInstance): void {
   });
 
   app.get("/api/monitoring/overview", { preHandler: requirePermission("runs.view") }, async (request) => {
-    // Member, password and workspace changes are left out for everyone but Administrators.
-    const isAdministrator = hasPermission(currentUser(request).role, "members.manage");
+    const user = currentUser(request);
 
-    const [workflowCounts] = await rows<{ total: number; published: number; drafts: number }>(sql`
+    // Someone who cannot edit workflows never sees drafts, so they are not counted for them.
+    const [allCounts] = await rows<{ total: number; published: number; drafts: number }>(sql`
       select count(*)::int as total,
         count(*) filter (where current_version_id is not null)::int as published,
         count(*) filter (where current_version_id is null)::int as drafts
       from workflows`);
+    const workflowCounts = hasPermission(user.role, "workflows.edit") ? allCounts : { total: allCounts.published, published: allCounts.published, drafts: 0 };
 
     const mostUsed = await rows<{ id: string; name: string; runs: number }>(sql`
       select w.id, w.name, count(*)::int as runs
@@ -180,7 +179,7 @@ export function registerMonitoringRoutes(app: FastifyInstance): void {
       activity: await db
         .select({ id: activity.id, actorName: activity.actorName, description: activity.description, createdAt: activity.createdAt })
         .from(activity)
-        .where(isAdministrator ? undefined : eq(activity.isAdminOnly, false))
+        .where(activityVisibleTo(user))
         .orderBy(desc(activity.createdAt))
         .limit(6),
     };
@@ -189,10 +188,8 @@ export function registerMonitoringRoutes(app: FastifyInstance): void {
   // The full activity history, newest first, one page at a time.
   app.get("/api/monitoring/activity", { preHandler: requirePermission("runs.view") }, async (request) => {
     const { page, search } = activityQuery.parse(request.query);
-    const isAdministrator = hasPermission(currentUser(request).role, "members.manage");
-
     const matching = and(
-      isAdministrator ? undefined : eq(activity.isAdminOnly, false),
+      activityVisibleTo(currentUser(request)),
       search ? or(ilike(activity.actorName, likePattern(search)), ilike(activity.description, likePattern(search))) : undefined,
     );
 

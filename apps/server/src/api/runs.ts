@@ -37,7 +37,10 @@ function hideStepData(step: StepRow) {
 
 export function registerRunRoutes(app: FastifyInstance): void {
   app.get("/api/runs", { preHandler: requirePermission("runs.view") }, async (request) => {
-    const { workflowId, status, mode, since, page, pageSize } = listQuery.parse(request.query);
+    const query = listQuery.parse(request.query);
+    const { workflowId, status, since, page, pageSize } = query;
+    // Test runs are of drafts, which only people who edit workflows can see.
+    const mode = hasPermission(currentUser(request).role, "workflows.edit") ? query.mode : "live";
     const filters: SQL[] = [];
     if (workflowId) filters.push(eq(runs.workflowId, workflowId));
     if (status) filters.push(eq(runs.status, status));
@@ -99,6 +102,7 @@ export function registerRunRoutes(app: FastifyInstance): void {
       .innerJoin(workflowVersions, eq(runs.versionId, workflowVersions.id))
       .where(eq(runs.id, id));
     if (!row) return reply.status(404).send({ error: "Run not found" });
+    if (row.run.mode === "test" && !hasPermission(currentUser(request).role, "workflows.edit")) return reply.status(404).send({ error: "Run not found" });
 
     const steps = await db.select().from(stepRuns).where(eq(stepRuns.runId, id)).orderBy(asc(stepRuns.startedAt));
     const canSeeData = hasPermission(currentUser(request).role, "runs.viewStepData");
@@ -123,12 +127,20 @@ export function registerRunRoutes(app: FastifyInstance): void {
     if (original.status !== "failed" && original.status !== "succeeded") {
       return reply.status(409).send({ error: "This run has not finished yet" });
     }
+    // Retrying needs the data the run started with, which is gone after the history period.
+    if (original.dataRemovedAt) {
+      return reply.status(409).send({ error: "This run's data was removed after the workspace's history period, so it cannot be run again. Start a new run instead." });
+    }
     if (from === "failed" && original.status !== "failed") {
       return reply.status(409).send({ error: "Only a failed run can be retried from its failed step" });
     }
 
     const person = currentUser(request).name;
     const run = from === "failed" ? await retryFromFailedStep(original, person) : await retryFromStart(original, person);
+    // Recorded by account, so the person's own runs can be shown to them.
+    await db.update(runs).set({ startedById: currentUser(request).id }).where(eq(runs.id, run.id));
+    const [workflow] = await db.select({ name: workflows.name }).from(workflows).where(eq(workflows.id, original.workflowId));
+    await recordActivity(currentUser(request), from === "failed" ? `retried ${workflow?.name ?? "a workflow"} from the failed step` : `ran ${workflow?.name ?? "a workflow"} again from the start`);
     return reply.status(202).send(run);
   });
 
@@ -140,7 +152,7 @@ export function registerRunRoutes(app: FastifyInstance): void {
     const wasDecided = await decideApproval(id, stepId, { approved, note, decidedBy: person });
     if (!wasDecided) return reply.status(409).send({ error: "This approval has already been decided or has expired" });
 
-    await recordActivity(person, `${approved ? "approved" : "rejected"} a waiting step`);
+    await recordActivity(currentUser(request), `${approved ? "approved" : "rejected"} a waiting step`);
     return reply.status(204).send();
   });
 }

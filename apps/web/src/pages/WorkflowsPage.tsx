@@ -5,6 +5,7 @@ import { api } from "../api.ts";
 import { useAuth } from "../auth.tsx";
 import { DesignIcon } from "../components/DesignIcon.tsx";
 import { Pager } from "../components/Pager.tsx";
+import { RunWorkflowDialog } from "../components/RunWorkflowDialog.tsx";
 import { PageHead, Shell } from "../components/Shell.tsx";
 import { useDismiss } from "../components/useDismiss.ts";
 import { StatusBadge } from "../components/StatusBadge.tsx";
@@ -137,11 +138,14 @@ export function WorkflowsPage() {
             <span className="search-ic"><Search size={14} aria-hidden="true" /></span>
             <input className="input" type="search" aria-label="Search workflows" placeholder="Search workflows" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
           </div>
-          <div className="row wrap" role="group" aria-label="Filter by status">
-            {statusFilters.map((filter) => (
-              <button key={filter.value} className={`chip ${status === filter.value ? "is-on" : ""}`} aria-pressed={status === filter.value} onClick={() => { setStatus(filter.value); setPage(1); }}>{filter.label}</button>
-            ))}
-          </div>
+          {/* Only people who edit workflows see drafts, so only they need this filter. */}
+          {canEdit && (
+            <div className="row wrap" role="group" aria-label="Filter by status">
+              {statusFilters.map((filter) => (
+                <button key={filter.value} className={`chip ${status === filter.value ? "is-on" : ""}`} aria-pressed={status === filter.value} onClick={() => { setStatus(filter.value); setPage(1); }}>{filter.label}</button>
+              ))}
+            </div>
+          )}
           <div className="grow" />
           <label className="small muted" htmlFor="workflow-sort">Sort by</label>
           <select id="workflow-sort" className="select workflow-sort" value={sortOrder} onChange={(event) => { setSortOrder(event.target.value as SortOrder); setPage(1); }}>
@@ -320,51 +324,6 @@ function WorkflowCard({ workflow, actions }: { workflow: WorkflowSummary; action
         <span><span className="strong num">{formatNumber(workflow.last30Days.total)}</span> <span className="muted">{workflow.last30Days.total === 1 ? "run" : "runs"}</span></span>
       </div>
     </article>
-  );
-}
-
-function RunWorkflowDialog({ workflow, onClose }: { workflow: WorkflowSummary; onClose: () => void }) {
-  const navigate = useNavigate();
-  const [text, setText] = useState("{\n  \n}");
-  const [problem, setProblem] = useState<string | null>(null);
-  const [isSending, setIsSending] = useState(false);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    let data: unknown = {};
-    try {
-      if (text.trim()) data = JSON.parse(text);
-    } catch {
-      setProblem("That is not valid JSON.");
-      return;
-    }
-
-    setIsSending(true);
-    try {
-      const run = await api.startRun(workflow.id, data);
-      navigate(`/executions/${run.id}`);
-    } catch (failure) {
-      setProblem((failure as Error).message);
-      setIsSending(false);
-    }
-  }
-
-  return (
-    <div className="scrim">
-      <form className="modal" role="dialog" aria-modal="true" aria-label={`Run ${workflow.name}`} onSubmit={submit}>
-        <h2>Run "{workflow.name}"</h2>
-        <p className="muted">This is a real run. It really sends messages and changes data.</p>
-        <div className="field">
-          <label className="label" htmlFor="run-data">Data to start with (JSON, optional)</label>
-          <textarea id="run-data" className="input area mono" rows={6} value={text} onChange={(event) => setText(event.target.value)} />
-        </div>
-        {problem && <p className="err-msg">{problem}</p>}
-        <div className="modal-a">
-          <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-p" disabled={isSending}>Run workflow</button>
-        </div>
-      </form>
-    </div>
   );
 }
 

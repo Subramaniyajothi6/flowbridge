@@ -184,11 +184,14 @@ export function ExecutionsPage() {
         )}
 
         <div className="row wrap">
-          <div className="seg-ctl" role="group" aria-label="Run type">
-            {modes.map((item) => (
-              <button key={item.value} className={mode === item.value ? "is-on" : ""} aria-pressed={mode === item.value} onClick={() => filterBy(() => setMode(item.value))}>{item.label}</button>
-            ))}
-          </div>
+          {/* Test runs are of drafts, which only people who edit workflows can see. */}
+          {can("workflows.edit") && (
+            <div className="seg-ctl" role="group" aria-label="Run type">
+              {modes.map((item) => (
+                <button key={item.value} className={mode === item.value ? "is-on" : ""} aria-pressed={mode === item.value} onClick={() => filterBy(() => setMode(item.value))}>{item.label}</button>
+              ))}
+            </div>
+          )}
           <div className="row wrap" role="group" aria-label="Filter by status">
             {statusFilters.map((filter) => (
               <button key={filter.value} className={`chip ${status === filter.value ? "is-on" : ""}`} onClick={() => filterBy(() => setStatus(filter.value))} aria-pressed={status === filter.value}>

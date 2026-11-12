@@ -7,6 +7,7 @@ import { permissionsFor } from "../auth/permissions.ts";
 import { currentUser, endSession, startSession, type SignedInUser } from "../auth/sessions.ts";
 import { db } from "../db/client.ts";
 import { users, workspace } from "../db/schema.ts";
+import { notify, peopleWhoCanReceive } from "../notifications/notify.ts";
 
 const email = z.string().trim().toLowerCase().email().max(200);
 const newPassword = z.string().min(MINIMUM_PASSWORD_LENGTH, `Use at least ${MINIMUM_PASSWORD_LENGTH} characters`).max(200);
@@ -62,6 +63,12 @@ export function registerAuthRoutes(app: FastifyInstance): void {
 
       await db.update(users).set({ lastSignInAt: sql`now()` }).where(eq(users.id, user.id));
       await startSession(reply, user.id);
+
+      // A first sign-in is when someone actually joins. Administrators can choose to hear about it.
+      if (!user.lastSignInAt) {
+        const administrators = (await peopleWhoCanReceive("invite")).filter((person) => person.id !== user.id).map((person) => person.id);
+        await notify(administrators, "invite", { title: `${user.name} joined the workspace`, detail: user.email, href: "/team" }, `invite:${user.id}`);
+      }
       return describeSession(user, (await getWorkspace())?.name ?? "");
     });
 

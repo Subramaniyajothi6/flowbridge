@@ -68,8 +68,8 @@ export function ExecutionDetailPage() {
         <PageHead title={run.workflowName} subtitle={`${run.versionNumber === null ? "Test of a draft" : `Version ${run.versionNumber}`}. ${humanize(run.triggerType)} run on ${formatDate(run.createdAt)}${run.startedBy ? ` by ${run.startedBy}` : ""}.${run.finishedAt ? ` Took ${formatDuration(run.startedAt, run.finishedAt)}.` : ""}`}>
           <StatusBadge status={run.status} />
           {can("builder.view") && <Link className="btn" to={`/workflows/${run.workflowId}`}>Open workflow</Link>}
-          {isFinished && can("runs.retry") && <button className="btn" disabled={isRetrying} onClick={() => retry("start")}>Run from start</button>}
-          {run.status === "failed" && can("runs.retry") && (
+          {isFinished && !run.dataRemovedAt && can("runs.retry") && <button className="btn" disabled={isRetrying} onClick={() => retry("start")}>Run from start</button>}
+          {run.status === "failed" && !run.dataRemovedAt && can("runs.retry") && (
             <button className="btn btn-p" disabled={isRetrying} onClick={() => retry("failed")}>
               <RotateCcw size={14} aria-hidden="true" /> Retry from failed step
             </button>
@@ -77,6 +77,9 @@ export function ExecutionDetailPage() {
         </PageHead>
 
         {retryError && <div className="notice err" role="alert">{retryError}</div>}
+        {run.dataRemovedAt && (
+          <div className="notice info">The data this run received and sent was removed on {formatDate(run.dataRemovedAt)}, as set under Keep run history in Settings. Its result and timing are kept, and it can no longer be run again.</div>
+        )}
         {run.retryOfRunId && <p className="small muted">This run is a retry. <Link to={`/executions/${run.retryOfRunId}`}>See the original run</Link></p>}
         {run.error && <FailureBanner run={run} />}
 

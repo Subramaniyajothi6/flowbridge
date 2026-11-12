@@ -185,6 +185,7 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
 
   const connectors = useLoad(api.listConnectors);
   const connections = useLoad(api.listConnections);
+  const defaults = useLoad(api.workspaceDefaults);
   const triggers = useLoad(() => api.listTriggers(workflowId), [workflowId]);
 
   const connectorList: ConnectorInfo[] = connectors.data ?? [];
@@ -321,6 +322,15 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
     setIsDirty(true);
   }
 
+  // A new step that calls another system starts with the workspace's default retries,
+  // set by an Administrator in Settings. It can still be changed on the step.
+  function makeStep(entry: PaletteEntry, stepId: string): WorkflowStep {
+    const step = entry.make(stepId, entry.stepName);
+    const attempts = defaults.data?.stepRetryAttempts ?? 1;
+    const canRetry = step.type === "http_request" || step.type === "connector" || step.type === "loop";
+    return canRetry && attempts > 1 && !step.retry ? { ...step, retry: { maxAttempts: attempts, delaySeconds: 30 } } : step;
+  }
+
   // Clicked: added after the selected step, or at the end of the workflow, and connected to it.
   // Dropped: placed where it was let go, unconnected, so the person draws its connections.
   function addStep(entry: PaletteEntry, droppedAt?: { x: number; y: number }) {
@@ -337,7 +347,7 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
       type: "step",
       selected: true,
       position: droppedAt ?? { x: (source as FlowNode).position.x + COLUMN_GAP, y: (source as FlowNode).position.y + edges.filter((edge) => edge.source === source?.id).length * 130 },
-      data: { step: entry.make(stepId, entry.stepName) },
+      data: { step: makeStep(entry, stepId) },
     };
 
     setNodes((current) => [...current.map((node) => ({ ...node, selected: false })), newNode]);
@@ -355,8 +365,8 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
 
     remember();
     const stepId = uniqueStepId(entry.baseId, nodes);
-    const step = entry.make(stepId, entry.stepName);
-    const room = makeRoomForInsert(nodes, edges, old.source, old.target);
+    const step = makeStep(entry, stepId);
+    const room =makeRoomForInsert(nodes, edges, old.source, old.target);
     const newNode: FlowNode = { id: stepId, type: "step", selected: true, position: room.position, data: { step } };
 
     setNodes([...room.nodes.map((node) => ({ ...node, selected: false })), newNode]);

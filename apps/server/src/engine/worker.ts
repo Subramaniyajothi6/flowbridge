@@ -6,6 +6,8 @@ import { db } from "../db/client.ts";
 import { runs } from "../db/schema.ts";
 import { fireDueTriggers } from "../triggers/fire-triggers.ts";
 import { advanceRun } from "./advance-run.ts";
+import { removeOldRunData } from "./run-history.ts";
+import { notifyConnectionProblems, notifyDailySummaries, notifyFailedRuns, sendPendingEmails } from "../notifications/checks.ts";
 import { ADVANCE_RUN_QUEUE, enqueueAdvanceRun, boss, type AdvanceRunJob } from "./queue.ts";
 import { resumeDueWaits } from "./waits.ts";
 
@@ -27,6 +29,10 @@ export async function startWorker(): Promise<() => void> {
   const stopTriggers = repeatWithoutOverlap(fireDueTriggers, config.TRIGGER_TICK_SECONDS, "Triggers");
   const stopWaits = repeatWithoutOverlap(resumeDueWaits, config.TRIGGER_TICK_SECONDS, "Waits");
   const stopActivityCleanup = repeatWithoutOverlap(removeOldActivity, ONE_DAY_SECONDS, "Activity clean-up");
+  const stopRunDataCleanup = repeatWithoutOverlap(async () => { await removeOldRunData(); }, ONE_DAY_SECONDS, "Run data clean-up");
+  // Failures are told about within a minute. Expiring connections and the 09:00 summary are checked every 15 minutes.
+  const stopFailureAlerts = repeatWithoutOverlap(async () => { await notifyFailedRuns(); await sendPendingEmails(); }, 60, "Failure notifications");
+  const stopSlowAlerts = repeatWithoutOverlap(async () => { await notifyConnectionProblems(); await notifyDailySummaries(); }, 15 * 60, "Connection and summary notifications");
 
   console.log(`Worker ${workerId} started`);
   return () => {
@@ -34,6 +40,9 @@ export async function startWorker(): Promise<() => void> {
     stopTriggers();
     stopWaits();
     stopActivityCleanup();
+    stopRunDataCleanup();
+    stopFailureAlerts();
+    stopSlowAlerts();
   };
 }
 

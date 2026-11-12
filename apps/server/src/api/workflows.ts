@@ -3,6 +3,7 @@ import { and, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { recordActivity } from "../auth/activity.ts";
+import { hasPermission } from "../auth/permissions.ts";
 import { currentUser, requirePermission } from "../auth/sessions.ts";
 import { config } from "../config.ts";
 import { censorSecrets } from "../connections/censor.ts";
@@ -10,6 +11,8 @@ import { encryptSecret } from "../connections/secrets.ts";
 import { db } from "../db/client.ts";
 import { runs, stepRuns, workflows, workflowVersions } from "../db/schema.ts";
 import { createRun } from "../engine/create-run.ts";
+import { notifyOwnerOfChange } from "../notifications/notify.ts";
+import { inputFieldsOf } from "./plain-words.ts";
 import { findUnconnectedSteps, stepSchema, workflowDefinitionSchema, type WorkflowDefinition } from "../engine/definition.ts";
 import { resolveReferences, type ReferenceContext } from "../engine/references.ts";
 import { resolveStepInput, runStep } from "../engine/steps/run-step.ts";
@@ -43,15 +46,17 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
 
     const [created] = await db
       .insert(workflows)
-      .values({ name: body.name, description: body.description, webhookToken: randomBytes(24).toString("hex"), draftDefinition: body.definition, updatedBy: person })
+      .values({ name: body.name, description: body.description, webhookToken: randomBytes(24).toString("hex"), draftDefinition: body.definition, createdById: currentUser(request).id, updatedBy: person })
       .returning();
-    await recordActivity(person, `created ${body.name}`);
+    await recordActivity(currentUser(request), `created ${body.name}`);
     return reply.status(201).send(toPublicWorkflow(created));
   });
 
   // Adds what the list screen shows: the status, the published version and the latest live run.
-  app.get("/api/workflows", { preHandler: requirePermission("workflows.view") }, async () => {
-    const rows = await db.select().from(workflows).orderBy(desc(workflows.updatedAt));
+  // Someone who cannot edit workflows only sees published ones, as they stand now, with no draft or test details.
+  app.get("/api/workflows", { preHandler: requirePermission("workflows.view") }, async (request) => {
+    const canSeeDrafts = hasPermission(currentUser(request).role, "workflows.edit");
+    const rows = await db.select().from(workflows).where(canSeeDrafts ? undefined : isNotNull(workflows.currentVersionId)).orderBy(desc(workflows.updatedAt));
     if (rows.length === 0) return [];
 
     const versionIds = rows.map((row) => row.currentVersionId).filter((id) => id !== null);
@@ -81,16 +86,18 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
       const version = versions.find((item) => item.id === row.currentVersionId);
       // The address of the webhook is a secret, so a list open to every role leaves it out.
       const { webhookToken, draftDefinition, ...listed } = toPublicWorkflow(row);
-      const steps = (draftDefinition ?? version?.definition)?.steps ?? [];
+      const steps = ((canSeeDrafts ? draftDefinition : null) ?? version?.definition)?.steps ?? [];
       return {
         ...listed,
-        status: publicationStatus(row),
+        status: canSeeDrafts ? publicationStatus(row) : "published",
         versionNumber: version?.versionNumber ?? null,
         stepCount: steps.length,
         // Lets a workflow without a description be summed up by its steps.
         stepNames: steps.map((step) => step.name),
+        // What the Run form asks for. Runs use the published version, so its fields are the ones that matter.
+        inputFields: inputFieldsOf(version?.definition),
         lastRun: latestRuns.find((item) => item.workflowId === row.id) ?? null,
-        lastTestRun: latestTestRuns.find((item) => item.workflowId === row.id) ?? null,
+        lastTestRun: canSeeDrafts ? latestTestRuns.find((item) => item.workflowId === row.id) ?? null : null,
         last30Days: usage.find((item) => item.workflowId === row.id) ?? { total: 0, succeeded: 0, failed: 0 },
       };
     });
@@ -114,14 +121,17 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
     const { name, description } = updateWorkflowBody.parse(request.body);
     const [updated] = await db.update(workflows).set({ name, description, updatedBy: currentUser(request).name, updatedAt: sql`now()` }).where(eq(workflows.id, id)).returning();
     if (!updated) return reply.status(404).send({ error: "Workflow not found" });
+    await notifyOwnerOfChange(updated, currentUser(request), "renamed");
     return toPublicWorkflow(updated);
   });
 
   app.delete("/api/workflows/:id", canEdit, async (request, reply) => {
     const { id } = idParams.parse(request.params);
-    const [deleted] = await db.delete(workflows).where(eq(workflows.id, id)).returning({ name: workflows.name });
+    const [deleted] = await db.delete(workflows).where(eq(workflows.id, id)).returning({ id: workflows.id, name: workflows.name, createdById: workflows.createdById, currentVersionId: workflows.currentVersionId });
     if (!deleted) return reply.status(404).send({ error: "Workflow not found" });
-    await recordActivity(currentUser(request).name, `deleted ${deleted.name}`);
+    // Business Users only hear about it if it was live, because they never saw a draft.
+    await recordActivity(currentUser(request), `deleted ${deleted.name}`, { shownToAll: deleted.currentVersionId !== null });
+    await notifyOwnerOfChange(deleted, currentUser(request), "deleted");
     return reply.status(204).send();
   });
 
@@ -148,6 +158,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
       .where(eq(workflows.id, id))
       .returning();
     if (!updated) return reply.status(404).send({ error: "Workflow not found" });
+    await notifyOwnerOfChange(updated, currentUser(request), "edited");
     return { ...toPublicWorkflow(updated), status: publicationStatus(updated) };
   });
 
@@ -167,7 +178,9 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
     const updated = await db.transaction((tx) => addVersion(tx, id, definition, person));
 
     const [version] = await db.select({ number: workflowVersions.versionNumber }).from(workflowVersions).where(eq(workflowVersions.id, updated.currentVersionId as string));
-    await recordActivity(person, `published ${workflow.name}, Version ${version.number}`);
+    // Everyone who runs workflows sees this, because the next run will use the new version.
+    await recordActivity(currentUser(request), `published ${workflow.name}, Version ${version.number}`, { shownToAll: true });
+    await notifyOwnerOfChange(workflow, currentUser(request), "published");
     return reply.status(201).send({ ...toPublicWorkflow(updated), status: publicationStatus(updated), versionNumber: version.number });
   });
 
@@ -202,7 +215,9 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
       triggerType: "manual",
       triggerData: body.data,
       startedBy: currentUser(request).name,
+      startedById: currentUser(request).id,
     });
+    await recordActivity(currentUser(request), `ran ${workflow.name}`);
     return reply.status(202).send(run);
   });
 

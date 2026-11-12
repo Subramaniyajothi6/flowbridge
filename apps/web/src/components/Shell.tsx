@@ -1,11 +1,12 @@
 import { BarChart3, BookOpen, History, LayoutDashboard, LayoutGrid, LogOut, Plug, Settings, Users, Workflow } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { api } from "../api.ts";
 import { ROLE_LABELS, useAuth } from "../auth.tsx";
 import { formatNumber, initials } from "../format.ts";
 import { useLoad } from "../useLoad.ts";
 import { AccountMenu } from "./AccountMenu.tsx";
+import { DesignIcon } from "./DesignIcon.tsx";
 import { NotificationBell } from "./NotificationBell.tsx";
 
 const links = [
@@ -30,9 +31,35 @@ export function BrandMark() {
   );
 }
 
+// The sidebar's collapsed or open state is remembered in this browser only.
+// Reading and writing are wrapped, because some browsers block storage.
+const SIDEBAR_KEY = "fb-side";
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveCollapsed(isCollapsed: boolean): void {
+  try {
+    localStorage.setItem(SIDEBAR_KEY, isCollapsed ? "1" : "0");
+  } catch {
+    // Not remembered, but the sidebar still works.
+  }
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const { session, can } = useAuth();
   const { pathname } = useLocation();
+  const [isCollapsed, setIsCollapsed] = useState(readCollapsed);
+
+  function toggleSidebar() {
+    saveCollapsed(!isCollapsed);
+    setIsCollapsed(!isCollapsed);
+  }
   // Reloads on every page change, so the numbers do not go stale.
   const usage = useLoad(api.usage, [pathname]);
 
@@ -48,7 +75,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="app">
-      <nav className="side" aria-label="Main">
+      <nav className={`side ${isCollapsed ? "is-col" : ""}`} aria-label="Main">
         <NavLink className="side-brand" to="/overview" aria-label="FlowBridge overview">
           <BrandMark />
           <span className="side-word">FlowBridge</span>
@@ -65,6 +92,10 @@ export function Shell({ children }: { children: ReactNode }) {
           <BookOpen size={17} aria-hidden="true" />
           <span className="nav-label">Help and support</span>
         </NavLink>
+        <button className="nav tip side-collapse m-hide" data-tip="Expand sidebar" aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!isCollapsed} onClick={toggleSidebar}>
+          <DesignIcon name="panel" size={17} />
+          <span className="nav-label">Collapse</span>
+        </button>
         {session && (
           <div className="user">
             <span className="avatar">{initials(session.user.name)}</span>
@@ -83,7 +114,8 @@ export function Shell({ children }: { children: ReactNode }) {
         <header className="top">
           <nav className="crumbs" aria-label="Current page"><b className="trunc">{section}</b></nav>
           <div className="grow" />
-          {usage.data && (
+          {/* The workspace's run allowance matters to the people who build and run its automations, not to every user. */}
+          {usage.data && can("workflows.edit") && (
             <div className="row small hide-m" title="Live runs this month. Test runs do not count.">
               <span className="hbar top-usage"><i style={{ width: `${usedShare}%` }} /></span>
               <span className="num muted">{formatNumber(usage.data.used)} of {formatNumber(usage.data.limit)} runs</span>

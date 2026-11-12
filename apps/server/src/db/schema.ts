@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { CustomAppDefinition } from "../connectors/custom-app.ts";
 import type { WorkflowDefinition } from "../engine/definition.ts";
 import type { PollConfig, PollCursor, ScheduleConfig } from "../triggers/definition.ts";
@@ -13,6 +13,10 @@ export const workspace = pgTable("workspace", {
   name: text("name").notNull(),
   // The most live runs allowed in a calendar month.
   monthlyRunLimit: integer("monthly_run_limit").notNull().default(25000),
+  // After this many days, the data that went through a finished run is removed. 0 keeps it forever.
+  runHistoryDays: integer("run_history_days").notNull().default(90),
+  // How many times a new HTTP, app or loop step tries before failing. 1 means it does not retry.
+  stepRetryAttempts: integer("step_retry_attempts").notNull().default(3),
   createdAt: createdAt(),
 });
 
@@ -49,8 +53,13 @@ export const activity = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     actorName: text("actor_name").notNull(),
     description: text("description").notNull(),
-    // Member, password and workspace changes are only shown to Administrators.
+    // Member, password and workspace changes are only shown to Administrators, and to the member concerned.
     isAdminOnly: boolean("is_admin_only").notNull().default(false),
+    // Who did it, and which member it is about, so each person can be shown their own history.
+    actorId: uuid("actor_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    aboutUserId: uuid("about_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    // Shown to Business Users too, because it changes a workflow they may run.
+    shownToAll: boolean("shown_to_all").notNull().default(false),
     createdAt: createdAt(),
   },
   // The history is read newest first, one page at a time.
@@ -70,10 +79,63 @@ export const workflows = pgTable("workflows", {
   currentVersionId: uuid("current_version_id"),
   // Saved edits that have not been published. Empty when there are none.
   draftDefinition: jsonb("draft_definition").$type<WorkflowDefinition>(),
+  // The person who created it. They are told when it fails or when someone else changes it.
+  createdById: uuid("created_by_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
   updatedBy: text("updated_by"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: createdAt(),
 });
+
+// What each person wants to be told about, and where. A missing row means the default in notifications/events.ts.
+export const notificationPreferences = pgTable(
+  "notification_preferences",
+  {
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    event: text("event").$type<NotificationEvent>().notNull(),
+    email: boolean("email").notNull(),
+    inApp: boolean("in_app").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.event] })],
+);
+
+export type NotificationEvent = "fail" | "digest" | "token" | "review" | "invite";
+export type EmailStatus = "none" | "pending" | "sent" | "failed";
+
+// Notifications already decided for a person: shown in the bell when in_app is set, and emailed when email_status is pending.
+// The key stops the same thing being sent twice, for example when the failure check runs again a minute later.
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    event: text("event").$type<NotificationEvent>().notNull(),
+    title: text("title").notNull(),
+    detail: text("detail").notNull().default(""),
+    href: text("href").notNull(),
+    inApp: boolean("in_app").notNull(),
+    emailStatus: text("email_status").$type<EmailStatus>().notNull().default("none"),
+    emailError: text("email_error"),
+    dedupeKey: text("dedupe_key").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [unique().on(table.userId, table.dedupeKey), index().on(table.userId, table.createdAt), index().on(table.emailStatus)],
+);
+
+// Templates made by people in this workspace from one of their workflows.
+// The ready-made templates that ship with FlowBridge are in the web app's code instead.
+export const workflowTemplates = pgTable("workflow_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  category: text("category").$type<TemplateCategory>().notNull(),
+  description: text("description").notNull().default(""),
+  // Saved without any connection, so whoever uses it chooses their own accounts.
+  definition: jsonb("definition").$type<WorkflowDefinition>().notNull(),
+  createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdByName: text("created_by_name").notNull(),
+  createdAt: createdAt(),
+});
+
+export type TemplateCategory = "Sales" | "Finance" | "Support" | "Operations";
 
 // A saved copy of a workflow. Rows here are never changed, so a run always
 // knows exactly which steps it was started with.
@@ -167,6 +229,7 @@ export const runs = pgTable(
     mode: text("mode").$type<RunMode>().notNull().default("live"),
     // The person who started it, when a person did.
     startedBy: text("started_by"),
+    startedById: uuid("started_by_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     triggerData: jsonb("trigger_data").notNull(),
     // Stops the same webhook delivery from starting two runs.
     idempotencyKey: text("idempotency_key"),
@@ -180,6 +243,9 @@ export const runs = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
+    // Set when the data that went through this run was removed after the workspace's history period.
+    // The run's status, error and timing stay, so Analytics still counts it.
+    dataRemovedAt: timestamp("data_removed_at", { withTimezone: true }),
   },
   (table) => [unique().on(table.workflowId, table.idempotencyKey), index().on(table.mode, table.createdAt)],
 );

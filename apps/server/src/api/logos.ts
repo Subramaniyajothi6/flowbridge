@@ -50,14 +50,16 @@ export function registerLogoRoutes(app: FastifyInstance): void {
     if (!connector) return reply.status(404).send({ error: "App not found" });
 
     await saveLogo(id, logo);
-    await recordActivity(currentUser(request).name, `changed the ${connector.name} logo`, "adminOnly");
+    await recordActivity(currentUser(request), `changed the ${connector.name} logo`, { adminOnly: true });
     return reply.status(204).send();
   });
 
   // Goes back to the logo that ships with FlowBridge.
   app.delete("/api/logos/:id", adminOnly, async (request, reply) => {
     const { id } = idParams.parse(request.params);
-    await db.delete(appLogos).where(eq(appLogos.connectorId, id));
+    const removed = await db.delete(appLogos).where(eq(appLogos.connectorId, id)).returning({ id: appLogos.connectorId });
+    const connector = getConnector(id);
+    if (removed.length > 0 && connector) await recordActivity(currentUser(request), `put back the original ${connector.name} logo`, { adminOnly: true });
     return reply.status(204).send();
   });
 }

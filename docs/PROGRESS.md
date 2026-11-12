@@ -8,6 +8,16 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Log (newest first)
 
+### 2026-11-12, laptop
+- **Sidebar:** Collapse button from the design.
+- **Administrator Overview:** one row of figures with icons, status dots and small bars (members, connected apps, runs used, workflows, success rate), "Needs an Administrator" (expiring or broken connections, apps hitting a limit, run limit at 80%, members who have not signed in) and "Team by role". Recent activity has avatars.
+- **Team templates:** Create template on the Templates page, saved without connections, with a "Made by your team" filter. Database update 0014.
+- **Workspace settings:** keep run history (default 90 days; old run data is cleared daily, runs stay listed), default retries for new steps, and a Plan and usage card. Database update 0015.
+- **Notifications tab** as in the design, with Email and In app switches for failures, a daily summary, expiring connections, changes to your workflow and new members. Emails go from the connected Gmail. Workflows now have owners, filled in from Activity. Database update 0016. Demo addresses on `.example` cannot receive email.
+- **Roles checked route by route:** all 52 API routes allow exactly the roles in the agreed table. Two small fixes came out of it.
+- **Business Users:** see only published workflows and live runs; Activity shows only their own and relevant entries (updates 0017 and 0018); and they have their own Overview with approvals, failures in plain words, automation cards with a simple Run form, and "What happened today".
+- 158 automated checks, the type check and the build pass. Business User and Administrator screens were checked against the real data through the routes, but **not yet by eye in the browser**.
+
 ### 2026-11-12, PC
 - **Builder checked by eye** and fixed: right-click menus now close when the canvas is moved or zoomed, and the "On error" line is drawn below the cards instead of behind them.
 - **Builder tools from the design:** a ghost card while dragging a step in, plus and delete buttons on a pointed-at connection (the plus inserts a step and makes room for it), undo and redo (Ctrl+Z, Ctrl+Y), a live "N problems" badge, buttons above a selected card, and a bottom bar with Tile view, zoom, fit and Tidy. All use the design's own icons.
@@ -75,8 +85,8 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Next
 
-1. Decide whether old runs should be cleared after a set time, as Activity entries are, and whether a workflow's description should be editable in the builder.
-2. Run the seed command with the demo password so Lena (Business User) can sign in again, then check the app as each of the three roles.
+1. Check by eye as each role: Lena's new Overview (Run form, approvals, What happened today), the Administrator Overview, Templates, Settings (Workspace and Notifications) and the collapsed sidebar. Decide whether a workflow's description should be editable in the builder.
+2. Jonah reset Lena's password again on 2026-11-12. Run the seed command with the demo password to put all demo accounts back on it.
 3. Finish the manual check: publish and run, failure and retry, approval. Publish "Jira test" if it is wanted in the demo.
 4. Deploy on Render, following the Deployment section of `README.md`.
 5. Before sharing the address, change the demo password by running the seed command with a new `SEED_PASSWORD`.

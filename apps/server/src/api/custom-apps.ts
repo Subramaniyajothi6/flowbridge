@@ -45,7 +45,7 @@ export function registerCustomAppRoutes(app: FastifyInstance): void {
 
     if (chosenLogo) await saveLogo(id, chosenLogo);
     registerCustomApp(id, definition);
-    await recordActivity(currentUser(request).name, `added the app ${definition.name}`);
+    await recordActivity(currentUser(request), `added the app ${definition.name}`);
     return reply.status(201).send({ id, hasLogo: chosenLogo !== null });
   });
 
@@ -62,7 +62,7 @@ export function registerCustomAppRoutes(app: FastifyInstance): void {
 
     const name = getConnector(id)?.name ?? id;
     unregisterConnector(id);
-    await recordActivity(currentUser(request).name, `removed the app ${name}`);
+    await recordActivity(currentUser(request), `removed the app ${name}`);
     return reply.status(204).send();
   });
 }

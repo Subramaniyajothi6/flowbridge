@@ -45,7 +45,7 @@ createRoot(document.getElementById("root") as HTMLElement).render(
           <Route path="/executions/:id" element={<Protected permission="runs.view"><ExecutionDetailPage /></Protected>} />
           <Route path="/integrations" element={<Protected permission="integrations.view"><IntegrationsPage /></Protected>} />
           <Route path="/activity" element={<Protected permission="runs.view"><ActivityPage /></Protected>} />
-          <Route path="/analytics"element={<Protected permission="runs.view"><AnalyticsPage /></Protected>} />
+          <Route path="/analytics" element={<Protected permission="runs.view"><AnalyticsPage /></Protected>} />
           <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
           <Route path="/team" element={<Protected permission="members.manage"><TeamPage /></Protected>} />
           <Route path="*" element={<UnknownAddress />} />

@@ -1,4 +1,10 @@
 import type {
+  MyOverview,
+  NotificationEvent,
+  NotificationSettings,
+  TeamTemplate,
+  TemplateCategory,
+  AdminOverview,
   ActivityPage,
   Analytics,
   AuthStatus,
@@ -68,12 +74,17 @@ export const api = {
   updateMember: (id: string, body: { role?: Role; isActive?: boolean }) => request<Member>(`/api/members/${id}`, { method: "PATCH", body }),
   resetMemberPassword: (id: string) => request<{ temporaryPassword: string }>(`/api/members/${id}/reset-password`, { method: "POST", body: {} }),
   getWorkspace: () => request<Workspace>("/api/workspace"),
-  updateWorkspace: (body: { name: string; monthlyRunLimit: number }) => request<Workspace>("/api/workspace", { method: "PATCH", body }),
+  updateWorkspace: (body: { name: string; monthlyRunLimit: number; runHistoryDays: number; stepRetryAttempts: number }) => request<Workspace>("/api/workspace", { method: "PATCH", body }),
+  workspaceDefaults: () => request<{ stepRetryAttempts: number }>("/api/workspace/defaults"),
 
   usage: () => request<Usage>("/api/monitoring/usage"),
   notifications: () => request<Notifications>("/api/monitoring/notifications"),
-  markNotificationsRead: () => request<void>("/api/monitoring/notifications/read", { method: "POST", body: {} }),
+  notificationSettings: () => request<NotificationSettings>("/api/notifications/preferences"),
+  saveNotificationSetting: (body: { event: NotificationEvent; email: boolean; inApp: boolean }) => request<void>("/api/notifications/preferences", { method: "PUT", body }),
+  markNotificationsRead:() => request<void>("/api/monitoring/notifications/read", { method: "POST", body: {} }),
   overview: () => request<Overview>("/api/monitoring/overview"),
+  myOverview: () => request<MyOverview>("/api/my/overview"),
+  adminOverview: () =>request<AdminOverview>("/api/administration/overview"),
   activity: (search: string, page: number) => request<ActivityPage>(`/api/monitoring/activity${query({ search, page: String(page) })}`),
   analytics: (days: number) => request<Analytics>(`/api/monitoring/analytics?days=${days}`),
   health: () => request<Health>("/api/monitoring/health"),
@@ -84,6 +95,10 @@ export const api = {
     request<Workflow>("/api/workflows", { method: "POST", body: { name, definition, description } }),
   renameWorkflow: (id: string, name: string) => request<Workflow>(`/api/workflows/${id}`, { method: "PATCH", body: { name } }),
   deleteWorkflow: (id: string) => request<void>(`/api/workflows/${id}`, { method: "DELETE" }),
+
+  listTeamTemplates: () => request<TeamTemplate[]>("/api/templates"),
+  createTemplate: (body: { workflowId: string; name: string; category: TemplateCategory; description: string }) => request<{ id: string }>("/api/templates", { method: "POST", body }),
+  deleteTemplate: (id: string) => request<void>(`/api/templates/${id}`, { method: "DELETE" }),
   saveDraft: (id: string, definition: Definition) =>
     request<Workflow & { status: PublicationStatus }>(`/api/workflows/${id}/draft`, { method: "PUT", body: { definition } }),
   publish: (id: string) =>

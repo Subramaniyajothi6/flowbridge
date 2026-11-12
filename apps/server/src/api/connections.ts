@@ -47,7 +47,7 @@ const publicColumns = {
 };
 
 // When a connection will stop working on its own, or null if it does not expire.
-function expiryOf(connectorId: string, createdAt: Date): Date | null {
+export function expiryOf(connectorId: string, createdAt: Date): Date | null {
   const connector = getConnector(connectorId);
   const isGoogle = connector?.auth.type === "oauth" && connector.auth.provider === "google";
   if (!isGoogle || config.GOOGLE_CONNECTION_DAYS <= 0) return null;
@@ -55,7 +55,7 @@ function expiryOf(connectorId: string, createdAt: Date): Date | null {
 }
 
 // A workflow uses a connection if its published version or its draft mentions the connection's ID.
-async function workflowsUsingConnections(): Promise<{ id: string; name: string; text: string }[]> {
+export async function workflowsUsingConnections(): Promise<{ id: string; name: string; text: string }[]> {
   const rows = await db
     .select({ id: workflows.id, name: workflows.name, draft: workflows.draftDefinition, published: workflowVersions.definition })
     .from(workflows)
@@ -138,7 +138,7 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
     const id = await saveConnection(connector, body.name ?? connector.name, { type: "token", token: body.token }, currentUser(request).name);
     try {
       const account = await verifyConnection(id);
-      await recordActivity(currentUser(request).name, `connected ${connector.name}`);
+      await recordActivity(currentUser(request), `connected ${connector.name}`);
       return reply.status(201).send({ id, account });
     } catch (error) {
       // A credential that does not work is not kept.
@@ -160,7 +160,7 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
     const { id } = idParams.parse(request.params);
     const [deleted] = await db.delete(connections).where(eq(connections.id, id)).returning({ connector: connections.connector });
     if (!deleted) return reply.status(404).send({ error: "Connection not found" });
-    await recordActivity(currentUser(request).name, `removed a ${humanizeConnector(deleted.connector)} connection`);
+    await recordActivity(currentUser(request), `removed a ${humanizeConnector(deleted.connector)} connection`);
     return reply.status(204).send();
   });
 
@@ -218,7 +218,7 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
         expiresAt: tokens.expiresAt,
       }, request.user?.name ?? null);
       await verifyConnection(id);
-      if (request.user) await recordActivity(request.user.name, `connected ${connector.name}`);
+      if (request.user) await recordActivity(request.user, `connected ${connector.name}`);
       return reply.redirect("/integrations?connected=1");
     } catch (error) {
       if (id) await db.delete(connections).where(eq(connections.id, id));

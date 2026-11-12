@@ -26,6 +26,11 @@ export function formatRelative(value: string, { exact = false } = {}): string {
   return formatDate(value);
 }
 
+// "10:42", in the person's own time zone.
+export function formatTime(value: string): string {
+  return new Date(value).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: displayTimezone });
+}
+
 // "Tuesday, 10 November 2026".
 export function formatDay(value: string): string {
   return new Date(value).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: displayTimezone });

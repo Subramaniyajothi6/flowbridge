@@ -12,6 +12,10 @@ const DOT_FOR_KIND: Record<NotificationItem["kind"], string> = {
   approval: "warn",
   retry: "warn",
   connection: "warn",
+  digest: "err",
+  // Grey, because nothing is wrong.
+  review: "",
+  invite: "",
 };
 
 export function NotificationBell() {

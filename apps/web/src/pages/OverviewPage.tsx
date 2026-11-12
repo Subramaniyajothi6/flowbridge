@@ -3,22 +3,39 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api.ts";
 import { useAuth } from "../auth.tsx";
+import { BusinessOverview } from "./BusinessOverview.tsx";
+import { greeting, RoleBanner } from "./overview-parts.tsx";
 import { PageHead, Shell } from "../components/Shell.tsx";
 import { StatusBadge } from "../components/StatusBadge.tsx";
-import { formatDate, formatNumber, formatPercent } from "../format.ts";
+import { formatDate, formatNumber, formatPercent, formatRelative, initials } from "../format.ts";
 import type { Health, Overview } from "../types.ts";
 import { useLoad } from "../useLoad.ts";
+import { AdminOverview } from "./AdminOverview.tsx";
 
-function greeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  return hour < 18 ? "Good afternoon" : "Good evening";
+// Each person keeps the same avatar colour, chosen from their name.
+const AVATAR_COLOURS = ["", "a2", "a3", "a4", "a5"];
+function avatarColour(name: string): string {
+  const total = [...name].reduce((sum, character) => sum + character.charCodeAt(0), 0);
+  return AVATAR_COLOURS[total % AVATAR_COLOURS.length];
+}
+
+// Activity is stored as "connected Jira", to follow a name. On its own line it starts with a capital.
+function sentence(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 export function OverviewPage() {
+  const { can } = useAuth();
+  // People who run workflows rather than build them get a page made for that.
+  if (!can("workflows.edit")) return <BusinessOverview />;
+  return <TeamOverview />;
+}
+
+function TeamOverview() {
   const { session, can } = useAuth();
   const { data, error, reload } = useLoad(api.overview);
   const firstName = session?.user.name.split(" ")[0] ?? "";
+  const isAdministrator = can("members.manage");
 
   const attentionCount = data?.attention.length ?? 0;
   const subtitle = attentionCount > 0 ? `${attentionCount} ${attentionCount === 1 ? "item needs" : "items need"} your attention.` : "Everything is running well.";
@@ -30,18 +47,23 @@ export function OverviewPage() {
           {can("workflows.edit") && <Link className="btn btn-p" to="/workflows">Create workflow</Link>}
         </PageHead>
 
+        <RoleBanner />
+
+        {/* Administrators get one combined row of figures, which includes the workflow figures below. */}
+        {isAdministrator && <AdminOverview overview={data} />}
+
         {error && <div className="notice err">{error}</div>}
         {!data && !error && <span className="skel" />}
 
         {data && (
           <>
-            <section className="card stats" aria-label="Summary">
+            {!isAdministrator && <section className="card stats" aria-label="Summary">
               <Stat label="Total workflows" value={formatNumber(data.workflows.total)} detail={`${data.workflows.drafts} drafts`} />
               <Stat label="Published" value={formatNumber(data.workflows.published)} detail={`${data.runs.active} in progress`} />
               <Stat label="Successful runs" value={formatNumber(data.runs.succeeded)} detail="Last 30 days" />
               <Stat label="Failed runs" value={formatNumber(data.runs.failed)} detail="Last 30 days" />
               <Stat label="Success rate" value={formatPercent(data.runs.succeeded, data.runs.succeeded + data.runs.failed)} detail="Finished runs" />
-            </section>
+            </section>}
 
             {/* Two rows of two cards, so the cards side by side start and end level. */}
             <div className="g-21 overview-rows">
@@ -88,9 +110,13 @@ export function OverviewPage() {
               <div className="card-h"><h2 className="card-t">Recent activity</h2>{data.activity.length > 0 && <Link className="small strong" to="/activity">View all</Link>}</div>
               {data.activity.length === 0 && <p className="card-b muted">Nothing to show yet.</p>}
               {data.activity.map((item) => (
-                <div className="activity-row" key={item.id}>
-                  <span>{item.actorName} {item.description}</span>
-                  <span className="small dim">{formatDate(item.createdAt)}</span>
+                <div className="ro-r" key={item.id}>
+                  <span className={`avatar ${avatarColour(item.actorName)}`}>{initials(item.actorName)}</span>
+                  <span className="ro-t">
+                    <b>{sentence(item.description)}</b>
+                    <span>{item.actorName}</span>
+                  </span>
+                  <span className="small muted ro-time">{formatRelative(item.createdAt)}</span>
                 </div>
               ))}
             </section>

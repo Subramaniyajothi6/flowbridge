@@ -199,3 +199,18 @@ Dates are in YYYY-MM-DD format.
 | 10.20 | Features in the prototype with nothing real behind them were left out: global search, notification settings and the replay slider (2026-11-10). | A control that does nothing is worse than no control. |
 | 10.21 | The Workflows list shows the latest test run, labelled "Test only", when a workflow has no live run (2026-11-10). | "Never run" was wrong for a workflow that had been tested. Test runs still stay out of statistics, following 10.15. |
 | 10.22 | Integrations cards appear only after both the services and the connections have loaded (2026-11-10). | Otherwise a connected service briefly shows the orange Connect button. |
+| 10.23 | Administrators get one combined row of figures on Overview (members, connected apps, runs used, workflows, success rate) and a "Needs an Administrator" list, with no two-factor card (2026-11-12). | Two rows of numbers was too much. Two-factor sign-in does not exist, so showing it would be false. |
+| 10.24 | Administrators and Workflow Builders can save a workflow as a team template. Its connections are left out (2026-11-12). | Teams reuse their own processes. Accounts belong to the person who connected them. |
+| 10.25 | Workspace settings: keep run history for 30 days to forever (default 90), default retries for new steps (default 3), and a usage card. Delete workspace and API keys are left out (2026-11-12). | Clearing old run data keeps the free database small without changing Analytics. Deleting the only workspace is too dangerous, and outside systems already start workflows through signed webhooks. |
+| 10.26 | Notifications follow the design: five events, each with Email and In app switches per person. Email goes from the workspace's connected Gmail. Workflows now have an owner (2026-11-12). | People should hear about failures without watching the app. Owners are needed so "your workflow" means something. |
+| 10.27 | A sidebar Collapse button, as in the design, remembered in the browser (2026-11-12). | More room for the canvas and tables. |
+
+## 11. What each role sees
+
+| # | Decision | Why |
+|---|----------|-----|
+| 11.1 | Business Users see only published workflows and live runs. Drafts, test runs and the Draft and Test filters are hidden from them (2026-11-12). | A draft is unfinished work. Workato and Make show operators only live automations. |
+| 11.2 | Activity: Administrators see everything. Workflow Builders see everything except other people's admin-only entries. Business Users see what they did, what is about them, and new published versions or deletions of live workflows (2026-11-12). | Real platforms keep the full log for administrators. Each entry now records who did it and who it is about, so this does not depend on names. |
+| 11.3 | Business Users get their own Overview: things waiting for them (approvals, failures in plain words), their automations as cards with a simple Run form, and "What happened today" as sentences (2026-11-12). | They run and watch automations rather than build them, and should never need to read an error code or write JSON. |
+| 11.4 | The Run form asks for the details a workflow reads from its start data instead of JSON. Builders can still switch to JSON (2026-11-12). | Typing JSON is an error-prone barrier for most people. |
+| 11.5 | The monthly run counter in the top bar is hidden from Business Users (2026-11-12). | It concerns the workspace's allowance, which they do not manage. |

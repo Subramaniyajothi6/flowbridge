@@ -5,7 +5,7 @@ import { db } from "../db/client.ts";
 import { runs, stepRuns, workflowVersions, type AttemptRecord, type WaitKind } from "../db/schema.ts";
 import { delayInSeconds, type WorkflowDefinition, type WorkflowStep } from "./definition.ts";
 import { findNextAction, hasErrorPath, type StepState } from "./next-action.ts";
-import { MissingReferenceError, resolveReferences, type ReferenceContext } from "./references.ts";
+import { datesFrom, MissingReferenceError, resolveReferences, type ReferenceContext } from "./references.ts";
 import { resolveStepInput, runStep } from "./steps/run-step.ts";
 
 // A step that keeps killing its worker must not be retried forever.
@@ -47,7 +47,8 @@ export async function advanceRun(runId: string, workerId: string): Promise<Advan
 
     const step = version.definition.steps.find((item) => item.id === action.stepId) as WorkflowStep;
     const saved = savedSteps.find((row) => row.stepId === step.id);
-    await executeStep(run, step, saved, buildContext(run.triggerData, savedSteps));
+    const dates = datesFrom(run.createdAt, await timeZoneForRun(run));
+    await executeStep(run, step, saved, buildContext(run.triggerData, dates, savedSteps));
     return "more-to-do";
   } finally {
     await releaseRun(runId, workerId);
@@ -108,8 +109,20 @@ async function pauseRun(runId: string): Promise<AdvanceResult> {
   return paused.length > 0 ? "paused" : "more-to-do";
 }
 
-function buildContext(triggerData: unknown, savedSteps: { stepId: string; status: string; output: unknown }[]) {
-  const context: ReferenceContext = { trigger: triggerData, steps: {} };
+// Whose day "today" means in {{dates.today}}: the person who started the run, or else the
+// person who created the workflow, for runs that a webhook or schedule started. Otherwise UTC.
+async function timeZoneForRun(run: Run): Promise<string> {
+  const result = await db.execute<{ timezone: string | null }>(sql`
+    select coalesce(starter.timezone, creator.timezone) as timezone
+    from workflows w
+    left join users starter on starter.id = ${run.startedById}
+    left join users creator on creator.id = w.created_by_id
+    where w.id = ${run.workflowId}`);
+  return result.rows[0]?.timezone ?? "UTC";
+}
+
+function buildContext(triggerData: unknown, dates: Record<string, string>, savedSteps: { stepId: string; status: string; output: unknown }[]) {
+  const context: ReferenceContext = { trigger: triggerData, steps: {}, dates };
   for (const row of savedSteps) {
     if (row.status === "succeeded") context.steps[row.stepId] = { output: row.output };
   }

@@ -15,12 +15,31 @@ describe("words for Business Users", () => {
     } as unknown as WorkflowDefinition;
 
     assert.deepEqual(inputFieldsOf(definition), [
-      { path: "body.name", name: "name" },
-      { path: "body.email", name: "email" },
-      { path: "body.company", name: "company" },
-      { path: "ticket", name: "ticket" },
+      { path: "body.name", name: "name", label: "Name", kind: "text", required: true },
+      { path: "body.email", name: "email", label: "Email", kind: "email", required: true },
+      { path: "body.company", name: "company", label: "Company", kind: "text", required: true },
+      { path: "ticket", name: "ticket", label: "Ticket", kind: "text", required: true },
     ]);
     assert.deepEqual(inputFieldsOf({ steps: [], edges: [] }), []);
+  });
+
+  it("follows the workflow's own Run form settings, and never drops a detail the steps use", () => {
+    const steps = [
+      { id: "mail", name: "Mail", type: "connector", config: { connector: "gmail", action: "send_email", connectionId: "", params: { to: "{{trigger.body.email}}", subject: "{{trigger.body.priority}}", body: "{{trigger.body.details}}" } } },
+    ] as never;
+    const runForm = [
+      { path: "body.details", label: "What happened", kind: "long_text" as const, required: true },
+      { path: "body.priority", label: "How urgent is it?", kind: "choice" as const, options: ["normal", "urgent"], required: true },
+      // A question for a detail the steps no longer use is left out.
+      { path: "body.old", label: "Old question", kind: "text" as const, required: false },
+    ];
+    const fields = inputFieldsOf({ steps, edges: [], runForm });
+    assert.deepEqual(fields.map((field) => [field.path, field.label, field.kind]), [
+      ["body.details", "What happened", "long_text"],
+      ["body.priority", "How urgent is it?", "choice"],
+      ["body.email", "Email", "email"],
+    ]);
+    assert.deepEqual(fields[1].options, ["normal", "urgent"]);
   });
 
   it("tells what happened to each run in one sentence", () => {

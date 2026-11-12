@@ -105,10 +105,23 @@ function fieldsNotInPath(action: CustomAction, input: Record<string, unknown>): 
   return Object.fromEntries(Object.entries(input).filter(([name, value]) => !inPath.includes(name) && value !== undefined));
 }
 
+// Removes the parts of a body that ended up empty. A template such as { "priority": { "name": "{{priority}}" } }
+// then sends nothing at all when no priority was given, instead of an empty { } that the app would reject.
+export function withoutEmptyParts(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutEmptyParts);
+  if (value === null || typeof value !== "object") return value;
+
+  const kept = Object.entries(value)
+    .map(([key, item]) => [key, withoutEmptyParts(item)] as const)
+    .filter(([, item]) => item !== undefined && !(item !== null && typeof item === "object" && !Array.isArray(item) && Object.keys(item).length === 0));
+  return Object.fromEntries(kept);
+}
+
 function buildBody(action: CustomAction, input: Record<string, unknown>): string {
   if (!action.bodyTemplate) return JSON.stringify(fieldsNotInPath(action, input));
   // A field left empty is left out, instead of failing.
-  return JSON.stringify(resolveReferences(JSON.parse(action.bodyTemplate), input as unknown as ReferenceContext, "undefined"));
+  const filled = resolveReferences(JSON.parse(action.bodyTemplate), input as unknown as ReferenceContext, "undefined");
+  return JSON.stringify(withoutEmptyParts(filled));
 }
 
 function toConnectorAction(baseUrl: string, action: CustomAction): ConnectorAction {

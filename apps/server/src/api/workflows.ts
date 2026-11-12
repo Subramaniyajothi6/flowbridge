@@ -14,7 +14,7 @@ import { createRun } from "../engine/create-run.ts";
 import { notifyOwnerOfChange } from "../notifications/notify.ts";
 import { inputFieldsOf } from "./plain-words.ts";
 import { findUnconnectedSteps, stepSchema, workflowDefinitionSchema, type WorkflowDefinition } from "../engine/definition.ts";
-import { resolveReferences, type ReferenceContext } from "../engine/references.ts";
+import { datesFrom, resolveReferences, type ReferenceContext } from "../engine/references.ts";
 import { resolveStepInput, runStep } from "../engine/steps/run-step.ts";
 
 const idParams = z.object({ id: z.uuid() });
@@ -247,8 +247,11 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
   // Runs one step on its own, so it can be tried while building.
   // This is a real call: a Slack step really posts its message.
   app.post("/api/workflows/:id/test-step", canEdit, async (request) => {
-    const { step, context } = testStepBody.parse(request.body);
-    const options = { allowPrivateUrls: config.ALLOW_PRIVATE_URLS, idempotencyKey: `test:${randomUUID()}` };
+    const parsed = testStepBody.parse(request.body);
+    const step = parsed.step;
+    // A single-step test counts its dates, such as {{dates.today}}, from now, in the tester's time zone.
+    const context = { ...parsed.context, dates: datesFrom(new Date(), currentUser(request).timezone) };
+    const options ={ allowPrivateUrls: config.ALLOW_PRIVATE_URLS, idempotencyKey: `test:${randomUUID()}` };
 
     if (step.type === "delay" || step.type === "approval") {
       return { ok: true, output: { note: "This step only waits, so there is nothing to test on its own." } };

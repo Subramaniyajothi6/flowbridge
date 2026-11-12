@@ -34,7 +34,12 @@ export type WorkflowStep =
 
 export type EdgeCondition = "success" | "true" | "false" | "approved" | "rejected" | "error";
 export type WorkflowEdge = { from: string; to: string; when: EdgeCondition };
-export type Definition = { steps: WorkflowStep[]; edges: WorkflowEdge[] };
+// One question on the Run now form. "path" is where the answer goes, such as "body.email".
+export type RunFormKind = "text" | "long_text" | "email" | "choice";
+export type RunFormField = { path: string; label: string; kind: RunFormKind; options?: string[]; required: boolean; hint?: string };
+export type InputField = RunFormField & { name: string };
+
+export type Definition = { steps: WorkflowStep[]; edges: WorkflowEdge[]; runForm?: RunFormField[] };
 
 export type RunStatus = "queued" | "running" | "waiting" | "succeeded" | "failed";
 export type StepStatus = "running" | "waiting" | "succeeded" | "failed" | "skipped";
@@ -59,7 +64,7 @@ export type WorkflowSummary = Omit<Workflow, "webhookToken"> & {
   stepCount: number;
   stepNames: string[];
   // The details the published version reads from its start data, asked for by the Run form.
-  inputFields: { path: string; name: string }[];
+  inputFields: InputField[];
   lastRun: { status: RunStatus; createdAt: string } | null;
   lastTestRun: { status: RunStatus; createdAt: string } | null;
   last30Days: { total: number; succeeded: number; failed: number };

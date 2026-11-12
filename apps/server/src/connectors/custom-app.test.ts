@@ -52,6 +52,21 @@ describe("running a custom app's action", () => {
     assert.deepEqual(JSON.parse(call.options?.body as string), { fields: { project: { key: "OPS" }, summary: "Task: Call Asha" } });
   });
 
+  it("leaves out a nested part whose field was not given, and keeps numbers and lists", async () => {
+    const withExtras = {
+      ...createIssue,
+      fields: [...createIssue.fields, { name: "priority", required: false }, { name: "points", required: false }, { name: "labels", required: false }],
+      bodyTemplate: '{ "fields": { "project": { "key": "{{project}}" }, "priority": { "name": "{{priority}}" }, "points": "{{points}}", "labels": "{{labels}}" } }',
+    };
+    const extras = connectorFor(customAppSchema.parse({ ...app, actions: [withExtras] }));
+
+    const bare = await runAction(extras.actions.create_issue, { project: "OPS", summary: "x" });
+    assert.deepEqual(JSON.parse(bare.call.options?.body as string), { fields: { project: { key: "OPS" } } });
+
+    const full = await runAction(extras.actions.create_issue, { project: "OPS", summary: "x", priority: "High", points: 3, labels: ["support", "urgent"] });
+    assert.deepEqual(JSON.parse(full.call.options?.body as string), { fields: { project: { key: "OPS" }, priority: { name: "High" }, points: 3, labels: ["support", "urgent"] } });
+  });
+
   it("sends the same repeat key on every attempt", async () => {
     const { call } = await runAction(connector.actions.create_issue, { project: "OPS", summary: "x" });
     assert.equal(call.options?.headers?.["idempotency-key"], "run:step");

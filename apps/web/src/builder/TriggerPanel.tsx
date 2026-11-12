@@ -2,7 +2,8 @@ import { Clock, Copy, RefreshCw, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api } from "../api.ts";
 import { formatDate } from "../format.ts";
-import type { Connection, PollConfig, ScheduleConfig, Trigger, Workflow } from "../types.ts";
+import type { Connection, PollConfig, RunFormField, ScheduleConfig, Trigger, Workflow } from "../types.ts";
+import { RunFormEditor } from "./RunFormEditor.tsx";
 
 const schedulePresets = [
   { label: "Every hour", cron: "0 * * * *" },
@@ -23,9 +24,12 @@ type Props = {
   testData: string;
   onTestDataChange: (value: string) => void;
   onChanged: () => Promise<void>;
+  // Empty when the workflow is read-only, so the form settings are not shown.
+  runForm?: RunFormField[];
+  onRunFormChange?: (fields: RunFormField[]) => void;
 };
 
-export function TriggerPanel({ workflow, triggers, connections, testData, onTestDataChange, onChanged }: Props) {
+export function TriggerPanel({ workflow, triggers, connections, testData, onTestDataChange, onChanged, runForm, onRunFormChange }: Props) {
   const webhookUrl = `${window.location.origin}/hooks/${workflow.webhookToken}`;
   const [copied, setCopied] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
@@ -46,6 +50,8 @@ export function TriggerPanel({ workflow, triggers, connections, testData, onTest
     <div className="cfg">
       <div className="cfg-h"><h2 className="card-t">Trigger</h2><p className="hint">Choose what starts this workflow.</p></div>
       <div className="cfg-b">
+        {runForm && onRunFormChange && <RunFormEditor fields={runForm} onChange={onRunFormChange} />}
+
         <div className="field">
           <label className="label" htmlFor="test-data">Test data for the Run button</label>
           <textarea id="test-data" className="area mono" value={testData} onChange={(event) => onTestDataChange(event.target.value)} />

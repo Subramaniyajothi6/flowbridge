@@ -87,11 +87,25 @@ const edgeSchema = z.object({
   when: z.enum(["success", "true", "false", "approved", "rejected", "error"]).default("success"),
 });
 
+// One question on the form people fill in to start a workflow with Run now.
+// "path" is where the answer goes, such as "body.email" for {{trigger.body.email}}.
+export const runFormFieldSchema = z.object({
+  path: z.string().regex(/^[A-Za-z_][\w-]*(\.[A-Za-z_][\w-]*)?$/, "Not a valid place for an answer"),
+  label: z.string().trim().min(1).max(60),
+  kind: z.enum(["text", "long_text", "email", "choice"]),
+  // The answers to pick from, for a choice. The workflow receives the chosen one exactly.
+  options: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
+  required: z.boolean().default(true),
+  hint: z.string().trim().max(160).optional(),
+});
+
 export const workflowDefinitionSchema = z
   .object({
     // A new workflow starts empty, so that it can be built on the canvas.
     steps: z.array(stepSchema).max(100),
     edges: z.array(edgeSchema).default([]),
+    // How the Run now form looks. Without it, the form asks for every detail the steps use.
+    runForm: z.array(runFormFieldSchema).max(30).optional(),
   })
   .superRefine((definition, context) => {
     for (const problem of findGraphProblems(definition)) {

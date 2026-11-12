@@ -6,7 +6,30 @@ export type ReferenceContext = {
   steps: Record<string, { output: unknown }>;
   // Only present while a Loop step is working on one item.
   loop?: { item: unknown; index: number };
+  // Dates such as {{dates.today}} or {{dates.in_3_days}}, counted from when the run started.
+  dates?: Record<string, string>;
 };
+
+const DAY_MS = 86_400_000;
+
+// Ready-made dates for steps that need one, such as a due date. They are counted from the
+// moment the run started, so a step that retries or resumes later gets the same dates.
+// "Today" is the day in the given time zone, written as "2026-11-12", the form most apps expect.
+export function datesFrom(runStart: Date, timeZone = "UTC"): Record<string, string> {
+  // The en-CA style writes dates as year-month-day.
+  const day = (offset: number) => new Date(runStart.getTime() + offset * DAY_MS).toLocaleDateString("en-CA", { timeZone });
+  return {
+    now: runStart.toISOString(),
+    today: day(0),
+    tomorrow: day(1),
+    in_2_days: day(2),
+    in_3_days: day(3),
+    in_5_days: day(5),
+    in_7_days: day(7),
+    in_14_days: day(14),
+    in_30_days: day(30),
+  };
+}
 
 export class MissingReferenceError extends Error {}
 

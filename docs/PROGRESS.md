@@ -8,7 +8,18 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Log (newest first)
 
-### 2026-11-12, laptop
+### 2026-11-13, PC
+- **Laptop work checked by eye:** the Administrator and Business User Overviews work. Fixed the missing red dot under "Did not finish" and the light-grey hover on the sidebar's sign-out button.
+- **New workflow "Support request to Jira"** (published, Version 2): check the email, create a Jira ticket, log it in the Tasks sheet, then for Highest priority escalate the ticket and alert Slack, email the customer, and comment on the ticket. If Jira fails, Slack is alerted and the customer still gets an email. It is in the shared database, not in the code.
+- **Jira app:** Create issue now fills Assignee, Priority, Labels, Start date, Due date, Story points and Sprint. New actions: Update issue and Add comment. Changed directly in the shared database, because there is no edit screen for an added app yet. Parent needs an epic and Team needs an Atlassian team; neither exists yet.
+- **Dates in steps:** `{{dates.today}}`, `{{dates.tomorrow}}`, `{{dates.in_3_days}}` and so on, counted from when the run started, in the time zone of the person who started it (or the workflow's creator).
+- **Custom apps:** a field left blank is now left out of the request entirely, instead of sending an empty `{}` the app rejects.
+- **Designed emails:** Gmail's Send email has optional Heading, Highlight, Button text, Button link, Brand and Footer. With a heading, it sends a designed HTML email (plus a plain-text copy). Body rules: `## Title`, `1.` and `- ` lists, `Label: value` lines become a table. All text is escaped.
+- **Run now form:** set up in the builder by clicking the Trigger card. Each question's wording, kind (short text, long text, email, dropdown), required, help text and order. Saved and published with the workflow. Dialogs taller than the window now scroll, so Run now can always be reached.
+- **Checked by a real run as Lena:** she filled the form and SCRUM-14 was created with the fields filled. That run showed priority "High" becoming Medium and the date being a day behind (UTC); both are fixed in Version 2, which has **not been run yet**.
+- Test leftovers: SCRUM-14 in Jira, Tasks sheet rows, Slack messages and test emails to ssrithar68@gmail.com. SCRUM-12 was deleted.
+- 171 automated checks, the type checks and the build pass.
+
 - **Sidebar:** Collapse button from the design.
 - **Administrator Overview:** one row of figures with icons, status dots and small bars (members, connected apps, runs used, workflows, success rate), "Needs an Administrator" (expiring or broken connections, apps hitting a limit, run limit at 80%, members who have not signed in) and "Team by role". Recent activity has avatars.
 - **Team templates:** Create template on the Templates page, saved without connections, with a "Made by your team" filter. Database update 0014.
@@ -85,14 +96,15 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Next
 
-1. Check by eye as each role: Lena's new Overview (Run form, approvals, What happened today), the Administrator Overview, Templates, Settings (Workspace and Notifications) and the collapsed sidebar. Decide whether a workflow's description should be editable in the builder.
-2. Jonah reset Lena's password again on 2026-11-12. Run the seed command with the demo password to put all demo accounts back on it.
-3. Finish the manual check: publish and run, failure and retry, approval. Publish "Jira test" if it is wanted in the demo.
-4. Deploy on Render, following the Deployment section of `README.md`.
-5. Before sharing the address, change the demo password by running the seed command with a new `SEED_PASSWORD`.
-6. Add the public address to the Google OAuth redirect addresses, then reconnect Gmail and Sheets on the live site. Google connections expire around 2026-11-16.
-7. Copy `reports` and `research_notes` into `docs`.
-8. Add the deployment link to the README and the final demonstration notes, then rehearse the demonstration.
+1. On the laptop: `git pull`, then restart the server **before** running any Jira workflow. The shared database already has the new Jira app and Version 2 of "Support request to Jira", which need this code. Then run it as Lena with priority High and with Highest, and check the Jira fields, dates, email design and Slack alert. Delete SCRUM-14 and other test tickets afterwards if not wanted.
+2. Check by eye as each role: Lena's new Overview (Run form, approvals, What happened today), the Administrator Overview, Templates, Settings (Workspace and Notifications) and the collapsed sidebar. Decide whether a workflow's description should be editable in the builder.
+3. Lena signed in with the demo password on 2026-11-13, so re-seeding may not be needed. Check the other demo accounts can sign in.
+4. Finish the manual check: publish and run, failure and retry, approval. Publish "Jira test" if it is wanted in the demo.
+5. Deploy on Render, following the Deployment section of `README.md`.
+6. Before sharing the address, change the demo password by running the seed command with a new `SEED_PASSWORD`.
+7. Add the public address to the Google OAuth redirect addresses, then reconnect Gmail and Sheets on the live site. Google connections expire around 2026-11-16.
+8. Copy `reports` and `research_notes` into `docs`.
+9. Add the deployment link to the README and the final demonstration notes, then rehearse the demonstration.
 
 ## Setting up a new machine
 

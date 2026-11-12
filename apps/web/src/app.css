@@ -89,7 +89,9 @@
 .no-access-card .page-title { font-size: 22px; }
 
 /* The app shell and working pages. */
-.user-out, .user-out:hover { color: #c4c4c5; }
+.user-out { color: #c4c4c5; }
+/* Same hover as the sidebar's menu items: a faint white tint and a white icon, not the light-page grey. */
+.side .user-out:hover, .side .user-out:focus-visible { background: rgba(255, 255, 255, 0.08); color: #fff; }
 .top-usage { width: 72px; display: inline-block; }
 .role-chip { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 13px; font-size: 12px; font-weight: 620; white-space: nowrap; background: var(--sunken); color: var(--ink-2); }
 .top-avatar { cursor: pointer; }
@@ -157,6 +159,7 @@
 .stat-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
 .stat-dot.is-ok { background: var(--ok-m); }
 .stat-dot.is-warn { background: var(--warn-m); }
+.stat-dot.is-err { background: var(--err-m); }
 .stat-meter { height: 5px; border-radius: 3px; background: var(--sunken); overflow: hidden; display: flex; margin-top: 8px; }
 .stat-meter i { display: block; height: 100%; background: #4B4B4F; }
 .stat-meter i.ok { background: var(--ok-m); }
@@ -181,6 +184,9 @@
 .needs-reason { color: var(--err) !important; font-size: 13px !important; }
 .decision-quote { margin: 0; padding: 10px 14px; border-left: 3px solid var(--line-2); background: var(--sunken); border-radius: var(--r-s); font-style: italic; }
 .run-dialog { max-width: 480px; }
+/* A dialog taller than the window, such as a long Run now form, scrolls inside itself,
+   so its buttons at the bottom can always be reached. */
+.scrim .modal { max-height: calc(100dvh - 32px); overflow-y: auto; }
 .run-fields { gap: 10px; }
 .run-none { margin: 4px 0; }
 .run-warning { font-size: 12.5px; }
@@ -320,3 +326,7 @@
 .pal-insert { margin: 10px 10px 0; padding: 8px 10px; font-size: 12px; flex-wrap: nowrap; }
 /* Every step block in the Executions step bar is the same size. The colour alone shows a failed step. */
 .trace .seg.err { height: 6px; }
+/* The Run now form settings in the builder's Trigger panel. */
+.run-form-list { display: flex; flex-direction: column; gap: 8px; }
+.run-form-row { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.run-form-kind { width: auto; min-width: 150px; }

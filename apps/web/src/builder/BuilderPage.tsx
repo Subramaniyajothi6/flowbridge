@@ -9,10 +9,10 @@ import { useAuth } from "../auth.tsx";
 import { StatusBadge } from "../components/StatusBadge.tsx";
 import { ApprovalIcon, DelayIcon, HttpIcon, IfIcon, LoopIcon, ServiceLogo } from "../components/StepIcon.tsx";
 import { formatDuration, humanize } from "../format.ts";
-import type { ConnectorInfo, Definition, PublicationStatus, RunDetail, Samples, Trigger, WorkflowDetail, WorkflowStep } from "../types.ts";
+import type { ConnectorInfo, Definition, PublicationStatus, RunDetail, RunFormField, Samples, Trigger, WorkflowDetail, WorkflowStep } from "../types.ts";
 import { useLoad } from "../useLoad.ts";
 import type { DataGroup } from "./fields.tsx";
-import { connectionToEdge, definitionToFlow, findProblems, firstHandleOf, flowToDefinition, listSampleValues, makeRoomForInsert, statusMap, stepsBefore, tidyLayout, TRIGGER_ID, uniqueStepId, wouldCreateLoop, type FlowNode } from "./flow.ts";
+import { connectionToEdge, definitionToFlow, findProblems, firstHandleOf, flowToDefinition, listSampleValues, makeRoomForInsert, runFormFor, statusMap, stepsBefore, tidyLayout, TRIGGER_ID, uniqueStepId, wouldCreateLoop, type FlowNode } from "./flow.ts";
 import { CanvasMenu, type MenuItem } from "./CanvasMenu.tsx";
 import { StepPanel } from "./StepPanel.tsx";
 import { TriggerPanel } from "./TriggerPanel.tsx";
@@ -147,6 +147,8 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
   }, [initial]);
   const [nodes, setNodes, applyNodeChanges] = useNodesState<FlowNode>(flow.nodes);
   const [edges, setEdges, applyEdgeChanges] = useEdgesState<Edge>(flow.edges);
+  // The Run now form settings. Only what the builder changed is kept; the rest is worked out from the steps.
+  const [savedRunForm, setSavedRunForm] = useState<RunFormField[] | undefined>((initial.draftDefinition ?? initial.versions[0]?.definition)?.runForm);
 
   const [name, setName] = useState(initial.name);
   const [publishedVersion, setPublishedVersion] = useState<number | null>(initial.versions[0]?.versionNumber ?? null);
@@ -472,7 +474,7 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
       const edge = edges.find((item) => item.id === open.id);
       const from = edge?.source === TRIGGER_ID ? "Trigger" : nodes.find((node) => node.id === edge?.source)?.data.step?.name;
       const to = nodes.find((node) => node.id === edge?.target)?.data.step?.name;
-      return `${from ?? "Step"} → ${to ?? "Step"}`;
+      return `${from ?? "Step"} â†’ ${to ?? "Step"}`;
     }
     return open.id === TRIGGER_ID ? "Trigger" : nodes.find((node) => node.id === open.id)?.data.step?.name ?? "Step";
   }
@@ -484,7 +486,7 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
 
     setIsSaving(true);
     try {
-      const saved = await api.saveDraft(workflowId, flowToDefinition(nodes, edges));
+      const saved = await api.saveDraft(workflowId, { ...flowToDefinition(nodes, edges), runForm: savedRunForm });
       if (name.trim() && name !== initial.name) await api.renameWorkflow(workflowId, name.trim());
       setPublication(saved.status);
       setIsDirty(false);
@@ -735,6 +737,8 @@ function Builder({ initial }: { initial: WorkflowDetail }) {
                 testData={testData}
                 onTestDataChange={(value) => { setTestData(value); setHasEditedTestData(true); }}
                 onChanged={triggers.reload}
+                runForm={canEdit ? runFormFor(flowToDefinition(nodes, edges).steps, savedRunForm) : undefined}
+                onRunFormChange={(fields) => { setSavedRunForm(fields); setIsDirty(true); }}
               />
             )}
             </fieldset>

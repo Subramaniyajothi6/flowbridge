@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api.ts";
 import { useAuth } from "../auth.tsx";
 import { humanize } from "../format.ts";
-import type { WorkflowSummary } from "../types.ts";
+import type { InputField, WorkflowSummary } from "../types.ts";
 
 // Puts each answer where the workflow reads it: "body.email" becomes { body: { email: ... } }.
 function buildData(values: Record<string, string>): Record<string, unknown> {
@@ -21,12 +21,40 @@ function buildData(values: Record<string, string>): Record<string, unknown> {
   return data;
 }
 
-function inputType(name: string): string {
-  const lower = name.toLowerCase();
-  if (lower.includes("email")) return "email";
+function inputType(field: InputField): string {
+  const lower = field.name.toLowerCase();
+  if (field.kind === "email" || lower.includes("email")) return "email";
   if (lower.includes("phone")) return "tel";
   if (lower.includes("url") || lower.includes("website")) return "url";
   return "text";
+}
+
+// One question, drawn the way the workflow's builder chose: a box, a large box or a list to pick from.
+function FormField({ field, value, autoFocus, onChange }: { field: InputField; value: string; autoFocus: boolean; onChange: (value: string) => void }) {
+  const id = `run-${field.path}`;
+  const common = { id, required: field.required, autoFocus, value, "aria-describedby": field.hint ? `${id}-hint` : undefined };
+
+  let control;
+  if (field.kind === "long_text") {
+    control = <textarea {...common} className="input area" rows={4} onChange={(event) => onChange(event.target.value)} />;
+  } else if (field.kind === "choice" && field.options?.length) {
+    control = (
+      <select {...common} className="select" onChange={(event) => onChange(event.target.value)}>
+        <option value="">Choose one</option>
+        {field.options.map((option) => <option key={option} value={option}>{humanize(option)}</option>)}
+      </select>
+    );
+  } else {
+    control = <input {...common} className="input" type={inputType(field)} onChange={(event) => onChange(event.target.value)} />;
+  }
+
+  return (
+    <div className="field">
+      <label className="label" htmlFor={id}>{field.label}{!field.required && <span className="dim"> (optional)</span>}</label>
+      {control}
+      {field.hint && <span className="hint" id={`${id}-hint`}>{field.hint}</span>}
+    </div>
+  );
 }
 
 // Starts a published workflow. It asks for the details the workflow uses, in plain fields,
@@ -80,18 +108,7 @@ export function RunWorkflowDialog({ workflow, onClose }: { workflow: WorkflowSum
           <div className="col run-fields">
             <p className="small muted">Fill in the details this workflow uses.</p>
             {fields.map((field, index) => (
-              <div className="field" key={field.path}>
-                <label className="label" htmlFor={`run-${field.path}`}>{humanize(field.name)}</label>
-                <input
-                  id={`run-${field.path}`}
-                  className="input"
-                  type={inputType(field.name)}
-                  required
-                  autoFocus={index === 0}
-                  value={values[field.path] ?? ""}
-                  onChange={(event) => setValues({ ...values, [field.path]: event.target.value })}
-                />
-              </div>
+              <FormField key={field.path} field={field} value={values[field.path] ?? ""} autoFocus={index === 0} onChange={(value) => setValues({ ...values, [field.path]: value })} />
             ))}
           </div>
         )}

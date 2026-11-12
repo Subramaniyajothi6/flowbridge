@@ -6,21 +6,48 @@ import { failureReason } from "./failure-reasons.ts";
 
 // The details a workflow reads from the data it starts with, such as {{trigger.body.email}}.
 // The Run form asks for these, so nobody has to type JSON.
-export type InputField = { path: string; name: string };
+export type InputField = {
+  path: string;
+  name: string;
+  label: string;
+  kind: "text" | "long_text" | "email" | "choice";
+  options?: string[];
+  required: boolean;
+  hint?: string;
+};
 
 const TRIGGER_REFERENCE = /\{\{\s*trigger\.([A-Za-z_][\w-]*)(?:\.([A-Za-z_][\w-]*))?/g;
 
-export function inputFieldsOf(definition: WorkflowDefinition | null | undefined): InputField[] {
-  if (!definition) return [];
+// "order_number" reads as "Order number".
+function labelFor(name: string): string {
+  const words = name.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]/g, " ").toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+// Every detail the steps read from the starting data, in the order they first appear.
+function detectedFields(definition: WorkflowDefinition): InputField[] {
   const found = new Map<string, InputField>();
   for (const match of JSON.stringify(definition.steps).matchAll(TRIGGER_REFERENCE)) {
     const [, first, second] = match;
-    // Webhook data arrives under "body", so {{trigger.body.email}} is the "email" field inside it.
-    const field = first === "body" && second ? { path: `body.${second}`, name: second } : { path: first, name: first };
     if (first === "body" && !second) continue;
-    if (!found.has(field.path)) found.set(field.path, field);
+    // Webhook data arrives under "body", so {{trigger.body.email}} is the "email" field inside it.
+    const name = first === "body" ? (second as string) : first;
+    const path = first === "body" ? `body.${second}` : first;
+    if (!found.has(path)) found.set(path, { path, name, label: labelFor(name), kind: name.toLowerCase().includes("email") ? "email" : "text", required: true });
   }
   return [...found.values()];
+}
+
+// The questions on the Run now form. The workflow's own form settings come first, in their order.
+// A detail the steps use that the settings do not mention yet is added at the end, so it is never missed.
+export function inputFieldsOf(definition: WorkflowDefinition | null | undefined): InputField[] {
+  if (!definition) return [];
+  const detected = detectedFields(definition);
+  const configured = (definition.runForm ?? [])
+    .filter((field) => detected.some((item) => item.path === field.path))
+    .map((field) => ({ ...field, name: field.path.split(".").pop() as string }));
+  const configuredPaths = new Set(configured.map((field) => field.path));
+  return [...configured, ...detected.filter((field) => !configuredPaths.has(field.path))];
 }
 
 // The service a step talks to, in the words a person would use.

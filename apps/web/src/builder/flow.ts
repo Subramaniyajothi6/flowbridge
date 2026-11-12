@@ -1,6 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import { humanize } from "../format.ts";
-import type { ConnectorConfig, ConnectorInfo, Definition, StepRun, StepStatus, WorkflowEdge, WorkflowStep } from "../types.ts";
+import type { ConnectorConfig, ConnectorInfo, Definition, RunFormField, StepRun, StepStatus, WorkflowEdge, WorkflowStep } from "../types.ts";
 
 // The server stores steps and edges. The canvas library wants nodes and edges.
 // This file converts between the two, so nothing else needs to know the difference.
@@ -56,6 +56,24 @@ export function tidyLayout(nodes: FlowNode[], edges: Edge[]): FlowNode[] {
   }
 
   return nodes.map((node) => ({ ...node, position: { x: (columns.get(node.id) ?? 1) * COLUMN_WIDTH, y: (rowOf.get(node.id) ?? 0) * ROW_HEIGHT } }));
+}
+
+const TRIGGER_REFERENCE = /\{\{\s*trigger\.([A-Za-z_][\w-]*)(?:\.([A-Za-z_][\w-]*))?/g;
+
+// The Run now form for these steps: the saved settings first, in their order, then any detail
+// the steps use that the settings do not mention yet. The server works this out the same way.
+export function runFormFor(steps: WorkflowStep[], saved: RunFormField[] = []): RunFormField[] {
+  const detected = new Map<string, RunFormField>();
+  for (const match of JSON.stringify(steps).matchAll(TRIGGER_REFERENCE)) {
+    const [, first, second] = match;
+    if (first === "body" && !second) continue;
+    const name = first === "body" ? (second as string) : first;
+    const path = first === "body" ? `body.${second}` : first;
+    if (!detected.has(path)) detected.set(path, { path, label: humanize(name), kind: name.toLowerCase().includes("email") ? "email" : "text", required: true });
+  }
+  const kept = saved.filter((field) => detected.has(field.path));
+  const keptPaths = new Set(kept.map((field) => field.path));
+  return [...kept, ...[...detected.values()].filter((field) => !keptPaths.has(field.path))];
 }
 
 // Where a step inserted into a connection goes: one column after the step before it,

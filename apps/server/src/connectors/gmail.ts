@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { renderEmail } from "./email-layout.ts";
 import { GOOGLE_IDENTITY_HOST, GOOGLE_IDENTITY_SCOPES, testGoogleConnection } from "./google-shared.ts";
 import { defineAction, type Connector } from "./types.ts";
 
@@ -7,19 +8,47 @@ const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 // A line break in the subject could be used to add extra email headers.
 const singleLine = z.coerce.string().refine((text) => !/[\r\n]/.test(text), "Must be a single line");
 
-export function buildRawEmail(to: string, subject: string, body: string): string {
-  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
-  const message = [
-    `To: ${to}`,
-    `Subject: ${encodedSubject}`,
-    "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
-    "Content-Transfer-Encoding: base64",
-    "",
-    Buffer.from(body, "utf8").toString("base64"),
-  ].join("\r\n");
-  return Buffer.from(message, "utf8").toString("base64url");
+const base64 = (text: string) => Buffer.from(text, "utf8").toString("base64");
+
+// With html, the email carries both versions. Email programs show the designed one,
+// and fall back to the plain text when they cannot show HTML.
+export function buildRawEmail(to: string, subject: string, body: string, html?: string): string {
+  const headers = [`To: ${to}`, `Subject: =?UTF-8?B?${base64(subject)}?=`, "MIME-Version: 1.0"];
+  const part = (type: string, content: string) => [`Content-Type: ${type}; charset=UTF-8`, "Content-Transfer-Encoding: base64", "", base64(content)];
+
+  let message: string[];
+  if (html === undefined) {
+    message = [...headers, ...part("text/plain", body)];
+  } else {
+    const boundary = `flowbridge-${Date.now().toString(36)}`;
+    message = [
+      ...headers,
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      "",
+      `--${boundary}`,
+      ...part("text/plain", body),
+      `--${boundary}`,
+      ...part("text/html", html),
+      `--${boundary}--`,
+    ];
+  }
+  return Buffer.from(message.join("\r\n"), "utf8").toString("base64url");
 }
+
+const optionalText = z.coerce.string().optional();
+
+// The fields that turn an email into a designed one. Without a heading, the email stays plain text.
+const sendEmailInput = z.object({
+  to: z.email(),
+  subject: singleLine,
+  body: z.coerce.string(),
+  heading: optionalText,
+  brand: optionalText,
+  highlight: optionalText,
+  buttonText: optionalText,
+  buttonUrl: optionalText,
+  footer: optionalText,
+});
 
 export const gmail: Connector = {
   id: "gmail",
@@ -38,13 +67,17 @@ export const gmail: Connector = {
 
   actions: {
     send_email: defineAction({
-      description: "Send an email",
-      input: z.object({ to: z.email(), subject: singleLine, body: z.coerce.string() }),
+      description: "Send an email. Add a heading to send it as a designed email.",
+      input: sendEmailInput,
       async run({ request }, input) {
+        const html = input.heading?.trim()
+          ? renderEmail({ heading: input.heading, body: input.body, brand: input.brand, highlight: input.highlight, buttonText: input.buttonText, buttonUrl: input.buttonUrl, footer: input.footer })
+          : undefined;
         const response = await request(`${API}/messages/send`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ raw: buildRawEmail(input.to, input.subject, input.body) }),
+          // In the plain-text copy, "## Heading" lines read better without the marks.
+          body: JSON.stringify({ raw: buildRawEmail(input.to, input.subject, html ? input.body.replace(/^##\s+/gm, "") : input.body, html) }),
         });
         return { id: response.id, threadId: response.threadId };
       },

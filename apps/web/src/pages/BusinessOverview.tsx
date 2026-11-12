@@ -200,7 +200,7 @@ function YourAutomations({ workflows, error, onRun }: { workflows: WorkflowSumma
         <div className="auto-grid">
           {shown.map((workflow) => {
             const last = lastRunText(workflow);
-            const about = workflow.description || (workflow.inputFields.length > 0 ? `Asks for ${workflow.inputFields.map((field) => field.name).join(", ")}.` : `${plural(workflow.stepCount, "step", "steps")}: ${workflow.stepNames.slice(0, 3).join(", ")}.`);
+            const about = workflow.description || (workflow.inputFields.length > 0 ? `Asks for ${workflow.inputFields.map((field) => field.label.toLowerCase()).join(", ")}.` : `${plural(workflow.stepCount, "step", "steps")}: ${workflow.stepNames.slice(0, 3).join(", ")}.`);
             return (
               <article className="auto-card" key={workflow.id}>
                 <h3 className="auto-name">{workflow.name}</h3>

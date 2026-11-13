@@ -1,10 +1,10 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { expiryOf } from "../api/connections.ts";
 import { openConnection } from "../connections/client.ts";
 import { getAction, getConnector } from "../connectors/registry.ts";
 import { config } from "../config.ts";
 import { db } from "../db/client.ts";
-import { connections, notifications, users } from "../db/schema.ts";
+import { connections, notifications } from "../db/schema.ts";
 import { canReceiveEmail, localTime, SUMMARY_HOUR } from "./events.ts";
 import { notify, ownerOrAdministrators, peopleWhoCanReceive } from "./notify.ts";
 
@@ -81,13 +81,19 @@ export async function notifyDailySummaries(now = new Date()): Promise<void> {
 
 // Sends waiting emails from the workspace's connected Gmail account. A failed email is not tried again.
 export async function sendPendingEmails(): Promise<void> {
-  const pending = await db
-    .select({ id: notifications.id, title: notifications.title, detail: notifications.detail, href: notifications.href, to: users.email })
-    .from(notifications)
-    .innerJoin(users, eq(notifications.userId, users.id))
-    .where(eq(notifications.emailStatus, "pending"))
-    .orderBy(asc(notifications.createdAt))
-    .limit(EMAILS_AT_ONCE);
+  // Each email is claimed before it is sent. When two copies of the app share the database,
+  // for example a laptop and the live site, only one of them can claim and send it.
+  const pending = await rows<{ id: string; title: string; detail: string; href: string; to: string }>(sql`
+    with claimed as (
+      update notifications set email_status = 'sending'
+      where id in (
+        select id from notifications where email_status = 'pending'
+        order by created_at limit ${EMAILS_AT_ONCE}
+        for update skip locked)
+      returning id, user_id, title, detail, href
+    )
+    select claimed.id, claimed.title, claimed.detail, claimed.href, users.email as "to"
+    from claimed join users on users.id = claimed.user_id`);
   if (pending.length === 0) return;
 
   const [gmail] = await db.select({ id: connections.id }).from(connections).where(and(eq(connections.connector, "gmail"), eq(connections.status, "active"))).limit(1);

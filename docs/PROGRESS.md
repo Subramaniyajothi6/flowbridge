@@ -8,6 +8,14 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Log (newest first)
 
+### 2026-11-13, laptop
+- Ran "Support request to Jira" Version 2 as Lena with case 1 (High): the ticket and the Tasks row were created. The workflow has no step for the Customers sheet; adding one is still undecided.
+- **`docs/demo-data.md`**: four ready-made support requests (High, Highest, Medium, Low) with what each should do, plus JSON versions. Customer emails are a placeholder because the repository is public.
+- **Emails:** every designed email is signed "Powered by FlowBridge". New Style choice on Send email (Clean card or Branded header) with Tagline and Facts fields. The builder now shows fixed choices as a dropdown.
+- **"Support request to Jira" Version 3** (published by Priya): all three customer emails use the Branded header. Not yet run.
+- Notification emails are claimed before sending, so the laptop and the live site cannot both send one.
+- 174 automated checks, the type checks and the build pass.
+
 ### 2026-11-13, PC
 - **Laptop work checked by eye:** the Administrator and Business User Overviews work. Fixed the missing red dot under "Did not finish" and the light-grey hover on the sidebar's sign-out button.
 - **New workflow "Support request to Jira"** (published, Version 2): check the email, create a Jira ticket, log it in the Tasks sheet, then for Highest priority escalate the ticket and alert Slack, email the customer, and comment on the ticket. If Jira fails, Slack is alerted and the customer still gets an email. It is in the shared database, not in the code.

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { renderEmail } from "./email-layout.ts";
+import { POWERED_BY, renderEmail } from "./email-layout.ts";
 import { GOOGLE_IDENTITY_HOST, GOOGLE_IDENTITY_SCOPES, testGoogleConnection } from "./google-shared.ts";
 import { defineAction, type Connector } from "./types.ts";
 
@@ -43,7 +43,10 @@ const sendEmailInput = z.object({
   subject: singleLine,
   body: z.coerce.string(),
   heading: optionalText,
+  style: z.enum(["clean_card", "branded_header"]).optional(),
   brand: optionalText,
+  tagline: optionalText,
+  facts: optionalText,
   highlight: optionalText,
   buttonText: optionalText,
   buttonUrl: optionalText,
@@ -71,13 +74,13 @@ export const gmail: Connector = {
       input: sendEmailInput,
       async run({ request }, input) {
         const html = input.heading?.trim()
-          ? renderEmail({ heading: input.heading, body: input.body, brand: input.brand, highlight: input.highlight, buttonText: input.buttonText, buttonUrl: input.buttonUrl, footer: input.footer })
+          ? renderEmail({ heading: input.heading, body: input.body, style: input.style, brand: input.brand, tagline: input.tagline, facts: input.facts, highlight: input.highlight, buttonText: input.buttonText, buttonUrl: input.buttonUrl, footer: input.footer })
           : undefined;
         const response = await request(`${API}/messages/send`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          // In the plain-text copy, "## Heading" lines read better without the marks.
-          body: JSON.stringify({ raw: buildRawEmail(input.to, input.subject, html ? input.body.replace(/^##\s+/gm, "") : input.body, html) }),
+          // In the plain-text copy, "## Heading" lines read better without the marks, and it is signed like the designed one.
+          body: JSON.stringify({ raw: buildRawEmail(input.to, input.subject, html ? `${input.body.replace(/^##\s+/gm, "")}\n\n--\n${POWERED_BY}` : input.body, html) }),
         });
         return { id: response.id, threadId: response.threadId };
       },

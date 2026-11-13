@@ -204,6 +204,9 @@ Dates are in YYYY-MM-DD format.
 | 10.25 | Workspace settings: keep run history for 30 days to forever (default 90), default retries for new steps (default 3), and a usage card. Delete workspace and API keys are left out (2026-11-12). | Clearing old run data keeps the free database small without changing Analytics. Deleting the only workspace is too dangerous, and outside systems already start workflows through signed webhooks. |
 | 10.26 | Notifications follow the design: five events, each with Email and In app switches per person. Email goes from the workspace's connected Gmail. Workflows now have an owner (2026-11-12). | People should hear about failures without watching the app. Owners are needed so "your workflow" means something. |
 | 10.27 | A sidebar Collapse button, as in the design, remembered in the browser (2026-11-12). | More room for the canvas and tables. |
+| 10.28 | Every designed email is signed "Powered by FlowBridge" under the customer's own brand, in both the HTML and plain-text copies (2026-11-13). | The platform is credited the way Mailchimp and Shopify do it, without taking over the customer's branding. |
+| 10.29 | Send email has a Style choice: Clean card (default) or Branded header, chosen from four designs. Branded header adds a dark band with a tagline, and key facts shown as large figures (2026-11-13). | It looks professional for customer-facing emails. Each workflow chooses per email, so existing emails are unchanged. |
+| 10.30 | A notification email is claimed before it is sent (2026-11-13). | The laptop and the live site share one database, so two copies of the app could otherwise send the same email twice. |
 
 ## 11. What each role sees
 

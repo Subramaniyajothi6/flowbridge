@@ -99,7 +99,8 @@ export const notificationPreferences = pgTable(
 );
 
 export type NotificationEvent = "fail" | "digest" | "token" | "review" | "invite";
-export type EmailStatus = "none" | "pending" | "sent" | "failed";
+// "sending" means one copy of the app has claimed the email and is sending it.
+export type EmailStatus = "none" | "pending" | "sending" | "sent" | "failed";
 
 // Notifications already decided for a person: shown in the bell when in_app is set, and emailed when email_status is pending.
 // The key stops the same thing being sent twice, for example when the failure check runs again a minute later.

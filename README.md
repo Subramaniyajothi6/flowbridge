@@ -53,6 +53,8 @@ The repository includes `render.yaml` for one free Render web service, with the 
 
 The free service sleeps after 15 minutes idle. Open it a few minutes before a demonstration.
 
+The live site and a local copy can share the same database. Connections saved in it, including Gmail and Google Sheets, work on both, so they only need connecting again when they expire. Runs and notification emails are claimed by one copy at a time, so nothing is done twice.
+
 ## Project layout
 
 ```

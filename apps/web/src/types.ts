@@ -134,6 +134,8 @@ export type JsonSchema = {
   required?: string[];
   default?: unknown;
   format?: string;
+  // Fixed choices, shown as a dropdown.
+  enum?: unknown[];
 };
 
 export type CustomAppAction = {

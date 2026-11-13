@@ -49,6 +49,39 @@ describe("sending a designed email through Gmail", () => {
     assert.match(message, /Content-Type: text\/html/);
   });
 
+  it("signs every designed email with Powered by FlowBridge, under the customer's brand", () => {
+    const html = renderEmail({ heading: "We are on it", body: "Hello", brand: "Meridian Logistics", footer: "Reference SCRUM-1." });
+    assert.match(html, /Powered by <span[^>]*>FlowBridge<\/span>/);
+    assert.ok(html.indexOf("Meridian Logistics") < html.indexOf("Powered by"), "the customer's brand comes first");
+    assert.ok(html.indexOf("Reference SCRUM-1.") < html.indexOf("Powered by"), "the signature sits under the footer");
+  });
+
+  it("draws the branded header style: dark band, tagline, facts as figures, priority as a label", () => {
+    const html = renderEmail({
+      style: "branded_header",
+      heading: "We are looking into your delayed shipment",
+      tagline: "Request received",
+      brand: "Meridian Logistics",
+      facts: "Reference: SCRUM-15\nOrder: ML-48213\nPriority: High\nnot a fact line",
+      highlight: "Our shipment is late.",
+      body: "Hi Asha,\n\nThanks for letting us know.",
+      footer: "Reply with SCRUM-15.",
+    });
+    assert.match(html, /background:#18181B;padding:28px/);
+    assert.match(html, /Request received/);
+    assert.match(html, /font-size:18px;font-weight:700;color:#18181B">SCRUM-15/);
+    assert.match(html, /background:#FFF1E8;color:#AB4109[^>]*>High</);
+    assert.equal(html.includes("not a fact line"), false);
+    assert.match(html, /Powered by <span[^>]*>FlowBridge<\/span>/);
+  });
+
+  it("keeps the clean card as the default, with the tagline and facts in it", () => {
+    const html = renderEmail({ heading: "H", body: "b", tagline: "Request received", facts: "Reference: SCRUM-15" });
+    assert.equal(html.includes("background:#18181B;padding:28px"), false);
+    assert.match(html, /Request received/);
+    assert.match(html, /SCRUM-15/);
+  });
+
   it("accepts the design fields on the Send email step", () => {
     const parsed = gmail.actions.send_email.input.safeParse({ to: "a@b.co", subject: "Hi", body: "b", heading: "H", brand: "B", highlight: "x", buttonText: "Go", buttonUrl: "https://example.com", footer: "f" });
     assert.equal(parsed.success, true);

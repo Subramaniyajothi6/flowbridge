@@ -177,7 +177,19 @@ function ConnectorFields({ config, groups, connectors, connections, onChange }: 
         if (schema.type === "array") {
           return <ListField key={name} label={humanize(name)} required={required} value={(config.params[name] as unknown[] | undefined) ?? []} groups={groups} onChange={(value) => updateParam(name, value)} />;
         }
-        return <DataField key={name} label={humanize(name)} required={required} multiline={name === "body" || name === "text"} value={String(config.params[name] ?? "")} groups={groups} placeholder={schema.default !== undefined ? String(schema.default) : undefined} onChange={(value) => updateParam(name, value)} />;
+        // A field with fixed choices, such as an email's Style, is a dropdown.
+        if (schema.enum) {
+          return (
+            <div className="field" key={name}>
+              <label className="label" htmlFor={`param-${name}`}>{humanize(name)}{required && <span className="req"> *</span>}</label>
+              <select id={`param-${name}`} className="select" value={String(config.params[name] ?? "")} onChange={(event) => updateParam(name, event.target.value)}>
+                {!required && <option value="">Default</option>}
+                {schema.enum.map((choice) => <option key={String(choice)} value={String(choice)}>{humanize(String(choice))}</option>)}
+              </select>
+            </div>
+          );
+        }
+        return <DataField key={name} label={humanize(name)} required={required} multiline={name === "body" || name === "text" || name === "facts"} value={String(config.params[name] ?? "")} groups={groups} placeholder={schema.default !== undefined ? String(schema.default) : undefined} onChange={(value) => updateParam(name, value)} />;
       })}
     </>
   );

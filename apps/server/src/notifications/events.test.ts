@@ -21,7 +21,7 @@ describe("notification settings", () => {
   it("know which addresses can never receive email", () => {
     assert.equal(canReceiveEmail("jonah@meridianlogistics.example"), false);
     assert.equal(canReceiveEmail("someone@example.com"), false);
-    assert.equal(canReceiveEmail("subramaniyajothi2002@gmail.com"), true);
+    assert.equal(canReceiveEmail("a.real.person@gmail.com"), true);
   });
 
   it("work out 09:00 in each person's own time zone", () => {

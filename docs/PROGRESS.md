@@ -20,6 +20,8 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 - "Support request to Jira" Version 3 run as Lena with High (SCRUM-18) and Highest (SCRUM-19): every step on both paths succeeded, branded emails received.
 - **Phone and tablet layout:** a bottom bar of Overview, Workflows, Executions, Analytics and More; More opens a sheet with the other pages, Help and Sign out. The tablet sidebar keeps the sign-out button inside it, four figures sit two by two between phone and laptop widths, and an odd last figure spans the row on phones. All 11 main pages were measured at 375, 768, 1024 and 1440 wide as Jonah: no overflow or clipped text. Not checked as Lena, and not reviewed by eye with screenshots.
 - **Execution trend:** a faint mark for days with no runs, a date under each week, and "No live runs before ..." when runs start partway through. Not yet seen on screen.
+- **Checked against the assignment PDF** section by section. The roles change was agreed with the team lead and is recorded in DECISIONS 3.16 and PRODUCT.md.
+- **Documents brought up to date:** the research is now in `docs/research/` (competitor analysis, six platform notes, and a new technical research note covering every topic in section 8 of the assignment). PRODUCT.md rewritten with the lifecycle, integrations and two documented workflows. ARCHITECTURE.md expanded with diagrams, every table, background tasks, code layout and deployment. TESTING.md rebuilt from the real run records, including the three real failures. README feature list updated.
 - 174 automated checks, the type checks and the build pass.
 
 ### 2026-11-13, PC
@@ -31,7 +33,7 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 - **Designed emails:** Gmail's Send email has optional Heading, Highlight, Button text, Button link, Brand and Footer. With a heading, it sends a designed HTML email (plus a plain-text copy). Body rules: `## Title`, `1.` and `- ` lists, `Label: value` lines become a table. All text is escaped.
 - **Run now form:** set up in the builder by clicking the Trigger card. Each question's wording, kind (short text, long text, email, dropdown), required, help text and order. Saved and published with the workflow. Dialogs taller than the window now scroll, so Run now can always be reached.
 - **Checked by a real run as Lena:** she filled the form and SCRUM-14 was created with the fields filled. That run showed priority "High" becoming Medium and the date being a day behind (UTC); both are fixed in Version 2, which has **not been run yet**.
-- Test leftovers: SCRUM-14 in Jira, Tasks sheet rows, Slack messages and test emails to ssrithar68@gmail.com. SCRUM-12 was deleted.
+- Test leftovers: SCRUM-14 in Jira, Tasks sheet rows, Slack messages and test emails to a personal test inbox. SCRUM-12 was deleted.
 - 171 automated checks, the type checks and the build pass.
 
 - **Sidebar:** Collapse button from the design.
@@ -110,15 +112,12 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 
 ## Next
 
-1. On the laptop: `git pull`, then restart the server **before** running any Jira workflow. The shared database already has the new Jira app and Version 2 of "Support request to Jira", which need this code. Then run it as Lena with priority High and with Highest, and check the Jira fields, dates, email design and Slack alert. Delete SCRUM-14 and other test tickets afterwards if not wanted.
-2. Check by eye as each role: Lena's new Overview (Run form, approvals, What happened today), the Administrator Overview, Templates, Settings (Workspace and Notifications) and the collapsed sidebar. Decide whether a workflow's description should be editable in the builder.
-3. Lena signed in with the demo password on 2026-11-13, so re-seeding may not be needed. Check the other demo accounts can sign in.
-4. Finish the manual check: publish and run, failure and retry, approval. Publish "Jira test" if it is wanted in the demo.
-5. Deploy on Render, following the Deployment section of `README.md`.
-6. Before sharing the address, change the demo password by running the seed command with a new `SEED_PASSWORD`.
-7. Add the public address to the Google OAuth redirect addresses, then reconnect Gmail and Sheets on the live site. Google connections expire around 2026-11-16.
-8. Copy `reports` and `research_notes` into `docs`.
-9. Add the deployment link to the README and the final demonstration notes, then rehearse the demonstration.
+1. Look at the Execution trend chart and the phone layout on screen (the live site has them). Check the phone layout as Lena too.
+2. Write the demonstration script (about 10 minutes, by role, including a failure, its alert and a retry from the failed step) and rehearse it on the live site. Open the site a few minutes early, because the free host sleeps.
+3. Close the clearest feature gap against the assignment: a "Transform data" step (change case, combine fields, simple sums, format dates). Optional after that: a PostgreSQL step for "store customer in database", per-workflow access, an edit screen for added apps, and treating `4xx` replies as permanent failures.
+4. Copy `D:\Adz4\FlowBridge Project\demo-accounts.txt` to the PC by hand. It is outside the repository on purpose.
+5. Google connections now expire around 2026-11-20. Reconnect Gmail and Google Sheets shortly before the demonstration if it is after that.
+6. Delete test tickets in Jira that are not wanted for the demonstration (SCRUM-6, 7, 8, 14 and later ones).
 
 ## Setting up a new machine
 

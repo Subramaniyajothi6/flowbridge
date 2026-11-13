@@ -4,10 +4,12 @@ A business process integration and automation platform. Organisations connect th
 
 **Live site:** https://flowbridge-gxx7.onrender.com (free hosting, so the first visit after a quiet spell can take up to a minute while it wakes up). Demonstration accounts are shared privately on request.
 
-- [docs/PRODUCT.md](docs/PRODUCT.md): what the product does, for whom, and an example workflow.
+- [docs/research/](docs/research/): domain research and competitor analysis of seven automation platforms, and the technical research behind the design.
+- [docs/PRODUCT.md](docs/PRODUCT.md): what the product does, for whom, its integrations, and two documented workflows.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the system is put together.
 - [docs/DECISIONS.md](docs/DECISIONS.md): every project decision and the reason for it.
 - [docs/TESTING.md](docs/TESTING.md): the testing report, covering successful and failed executions.
+- [docs/demo-data.md](docs/demo-data.md): ready-made test data for the demonstration.
 - [docs/PROGRESS.md](docs/PROGRESS.md): current state and what comes next.
 
 ## Features
@@ -15,11 +17,15 @@ A business process integration and automation platform. Organisations connect th
 - Visual builder with branching, delays, approvals, loops, retries and error paths
 - Drafts, test runs and numbered published versions
 - Webhook, schedule, polling and manual triggers
-- Encrypted connections to Slack, Google Sheets, Gmail and Stripe test mode
+- Encrypted connections to Slack, Google Sheets, Gmail, Stripe test mode and Jira, plus any app an Administrator describes, and an HTTP step for any web API
+- Run now with a simple form, so people starting a workflow never write JSON
+- Designed customer emails, signed "Powered by FlowBridge"
 - Crash recovery, so a run continues without repeating finished steps
 - Retry from the failed step, with successful steps kept
-- Sign-in with four roles, enforced on the server
-- Overview, Analytics, system health, usage limits and CSV export
+- Sign-in with three roles (Administrator, Workflow Builder, Business User), enforced on every API route, each with its own Overview
+- Notifications by email and in the app: failures, a daily summary, expiring connections and workflow changes
+- Executions, Analytics with failures in plain words, Activity, system health, usage limits and CSV export
+- Works on phones, tablets and computers
 
 ## Setup
 

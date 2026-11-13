@@ -2,6 +2,8 @@
 
 A business process integration and automation platform. Organisations connect their applications, build workflows on a visual canvas, react to webhooks and schedules, and monitor every run step by step.
 
+**Live site:** https://flowbridge-gxx7.onrender.com (free hosting, so the first visit after a quiet spell can take up to a minute while it wakes up). Demonstration accounts are shared privately on request.
+
 - [docs/PRODUCT.md](docs/PRODUCT.md): what the product does, for whom, and an example workflow.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the system is put together.
 - [docs/DECISIONS.md](docs/DECISIONS.md): every project decision and the reason for it.

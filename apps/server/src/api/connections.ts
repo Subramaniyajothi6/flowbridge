@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { and, desc, eq, gt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ne, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { recordActivity } from "../auth/activity.ts";
@@ -106,6 +106,29 @@ async function verifyConnection(connectionId: string): Promise<string> {
     .set({ account, status: "active", lastCheckedAt: sql`now()`, updatedAt: sql`now()` })
     .where(eq(connections.id, connectionId));
   return account;
+}
+
+// Connecting the same account again refreshes the connection it already has, instead of adding a second one.
+// Workflows point at a connection's id, so they keep working, and the expiry clock starts again from now.
+// Returns the id of the connection that was refreshed, or null when this is a new account.
+export async function reuseExistingConnection(connectorId: string, account: string, newId: string): Promise<string | null> {
+  const [existing] = await db
+    .select({ id: connections.id })
+    .from(connections)
+    .where(and(eq(connections.connector, connectorId), eq(connections.account, account), ne(connections.id, newId)))
+    .orderBy(asc(connections.createdAt))
+    .limit(1);
+  if (!existing) return null;
+
+  await db.transaction(async (tx) => {
+    const [fresh] = await tx.select({ encryptedCredentials: connections.encryptedCredentials }).from(connections).where(eq(connections.id, newId));
+    await tx
+      .update(connections)
+      .set({ encryptedCredentials: fresh.encryptedCredentials, status: "active", createdAt: sql`now()`, updatedAt: sql`now()`, lastCheckedAt: sql`now()` })
+      .where(eq(connections.id, existing.id));
+    await tx.delete(connections).where(eq(connections.id, newId));
+  });
+  return existing.id;
 }
 
 export function registerConnectionRoutes(app: FastifyInstance): void {
@@ -217,8 +240,10 @@ export function registerConnectionRoutes(app: FastifyInstance): void {
         refreshToken: tokens.refreshToken,
         expiresAt: tokens.expiresAt,
       }, request.user?.name ?? null);
-      await verifyConnection(id);
-      if (request.user) await recordActivity(request.user, `connected ${connector.name}`);
+      const account = await verifyConnection(id);
+      const existingId = await reuseExistingConnection(connector.id, account, id);
+      if (existingId) id = undefined;
+      if (request.user) await recordActivity(request.user, `${existingId ? "reconnected" : "connected"} ${connector.name}`);
       return reply.redirect("/integrations?connected=1");
     } catch (error) {
       if (id) await db.delete(connections).where(eq(connections.id, id));

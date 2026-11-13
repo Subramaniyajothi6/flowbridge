@@ -14,6 +14,9 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 - **Emails:** every designed email is signed "Powered by FlowBridge". New Style choice on Send email (Clean card or Branded header) with Tagline and Facts fields. The builder now shows fixed choices as a dropdown.
 - **"Support request to Jira" Version 3** (published by Priya): all three customer emails use the Branded header. Not yet run.
 - Notification emails are claimed before sending, so the laptop and the live site cannot both send one.
+- **Deployed** on Render's free plan, Singapore: https://flowbridge-gxx7.onrender.com. It shares the Neon database with local copies. `PUBLIC_URL` is set, and the live callback address is added to the Google client.
+- **Demo password changed** for all four accounts. The new one is in `D:\Adz4\FlowBridge Project\demo-accounts.txt` on the laptop, outside the repository; copy it to the PC by hand. The password in `flowbridge-html\README.txt` no longer works.
+- **Reconnecting the same Google account now refreshes the existing connection** (same id, new 7-day clock) instead of adding a second one that no workflow uses.
 - 174 automated checks, the type checks and the build pass.
 
 ### 2026-11-13, PC

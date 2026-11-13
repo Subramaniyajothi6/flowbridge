@@ -207,6 +207,8 @@ Dates are in YYYY-MM-DD format.
 | 10.28 | Every designed email is signed "Powered by FlowBridge" under the customer's own brand, in both the HTML and plain-text copies (2026-11-13). | The platform is credited the way Mailchimp and Shopify do it, without taking over the customer's branding. |
 | 10.29 | Send email has a Style choice: Clean card (default) or Branded header, chosen from four designs. Branded header adds a dark band with a tagline, and key facts shown as large figures (2026-11-13). | It looks professional for customer-facing emails. Each workflow chooses per email, so existing emails are unchanged. |
 | 10.30 | A notification email is claimed before it is sent (2026-11-13). | The laptop and the live site share one database, so two copies of the app could otherwise send the same email twice. |
+| 10.31 | Connecting an account that is already connected refreshes that connection, keeping its id and restarting its expiry (2026-11-13). | Workflows refer to a connection's id. A second connection would leave every workflow on the old one, which then expires. |
+| 10.32 | Deployed on Render's free plan in Singapore, sharing the Neon database with local copies. The demo password was changed before the address was shared and is kept outside the repository (2026-11-13). | Free, and in the same region as the database. A password known from earlier reviews would let anyone use the connected Gmail, Slack and Jira accounts. |
 
 ## 11. What each role sees
 

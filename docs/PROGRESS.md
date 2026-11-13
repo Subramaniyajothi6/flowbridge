@@ -17,6 +17,9 @@ Before starting: run `git pull`. When finishing: add a new entry at the top of t
 - **Deployed** on Render's free plan, Singapore: https://flowbridge-gxx7.onrender.com. It shares the Neon database with local copies. `PUBLIC_URL` is set, and the live callback address is added to the Google client.
 - **Demo password changed** for all four accounts. The new one is in `D:\Adz4\FlowBridge Project\demo-accounts.txt` on the laptop, outside the repository; copy it to the PC by hand. The password in `flowbridge-html\README.txt` no longer works.
 - **Reconnecting the same Google account now refreshes the existing connection** (same id, new 7-day clock) instead of adding a second one that no workflow uses.
+- "Support request to Jira" Version 3 run as Lena with High (SCRUM-18) and Highest (SCRUM-19): every step on both paths succeeded, branded emails received.
+- **Phone and tablet layout:** a bottom bar of Overview, Workflows, Executions, Analytics and More; More opens a sheet with the other pages, Help and Sign out. The tablet sidebar keeps the sign-out button inside it, four figures sit two by two between phone and laptop widths, and an odd last figure spans the row on phones. All 11 main pages were measured at 375, 768, 1024 and 1440 wide as Jonah: no overflow or clipped text. Not checked as Lena, and not reviewed by eye with screenshots.
+- **Execution trend:** a faint mark for days with no runs, a date under each week, and "No live runs before ..." when runs start partway through. Not yet seen on screen.
 - 174 automated checks, the type checks and the build pass.
 
 ### 2026-11-13, PC

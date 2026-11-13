@@ -64,10 +64,11 @@ export function AnalyticsPage() {
               <div className="card-b col">
                 {showTable ? <TrendTable series={series} /> : (
                   <>
+                    {quietStart(series) && <p className="small dim trend-note">{quietStart(series)}</p>}
                     <DayBars title="Successful runs per day" tone="tall" series={series} valueOf={(day) => day.succeeded} format={formatNumber} />
                     <DayBars title="Failed runs per day" tone="tone-fail" series={series} valueOf={(day) => day.failed} format={formatNumber} />
                     <DayBars title="Average duration per day" tone="tone-time" series={series} valueOf={(day) => day.average_seconds} format={formatSeconds} />
-                    <div className="row between small dim num"><span>{shortDate(series[0].day)}</span><span>{shortDate(series[series.length - 1].day)}</span></div>
+                    <DateAxis series={series} />
                   </>
                 )}
               </div>
@@ -173,7 +174,8 @@ function DayBars({ title, tone, series, valueOf, format }: { title: string; tone
           const value = valueOf(day);
           return (
             <div className="bar-col" key={day.day}>
-              {value > 0 && <div className="bar" style={{ height: `${Math.max(4, (value / peak) * 100)}%` }} />}
+              {/* A day with nothing still gets a faint mark, so it reads as zero rather than missing. */}
+              {value > 0 ? <div className="bar" style={{ height: `${Math.max(4, (value / peak) * 100)}%` }} /> : <div className="bar-zero" />}
               <span className="bar-tip"><b>{format(value)}</b> {shortDate(day.day)}</span>
             </div>
           );
@@ -181,6 +183,28 @@ function DayBars({ title, tone, series, valueOf, format }: { title: string; tone
       </div>
     </div>
   );
+}
+
+// Dates under the bars: every day for a week, otherwise one a week, counted back from today so the last bar is always labelled.
+function DateAxis({ series }: { series: Day[] }) {
+  const step = series.length <= 7 ? 1 : 7;
+  const last = series.length - 1;
+  return (
+    <div className="day-axis" aria-hidden="true">
+      {series.map((day, index) => {
+        const isLabelled = (last - index) % step === 0;
+        const edge = index === 0 ? "is-first" : index === last ? "is-last" : "";
+        return <span className={`day-axis-col ${edge}`} key={day.day}>{isLabelled && <span className="day-axis-label">{shortDate(day.day)}</span>}</span>;
+      })}
+    </div>
+  );
+}
+
+// When the first live run falls partway through the period, a short note explains the empty start.
+function quietStart(series: Day[]): string | null {
+  const first = series.findIndex((day) => day.succeeded + day.failed > 0);
+  if (first === -1) return "No live runs in this period.";
+  return first > 0 ? `No live runs before ${shortDate(series[first].day)}.` : null;
 }
 
 function TrendTable({ series }: { series: Day[] }) {

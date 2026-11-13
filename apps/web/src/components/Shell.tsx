@@ -1,5 +1,5 @@
-import { BarChart3, BookOpen, History, LayoutDashboard, LayoutGrid, LogOut, Plug, Settings, Users, Workflow } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { BarChart3, BookOpen, History, LayoutDashboard, LayoutGrid, ListChecks, LogOut, Menu, Plug, Settings, Users, Workflow } from "lucide-react";
+import { useCallback, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { api } from "../api.ts";
 import { ROLE_LABELS, useAuth } from "../auth.tsx";
@@ -7,18 +7,25 @@ import { formatNumber, initials } from "../format.ts";
 import { useLoad } from "../useLoad.ts";
 import { AccountMenu } from "./AccountMenu.tsx";
 import { DesignIcon } from "./DesignIcon.tsx";
+import { MoreSheet } from "./MoreSheet.tsx";
 import { NotificationBell } from "./NotificationBell.tsx";
 
+// On phones the sidebar becomes a bar along the bottom: the four pages marked "phone", plus a More tab.
+// More opens a sheet with every other page, so nothing is out of reach (Material and Apple guidance:
+// at most five items in a bottom bar, the rest behind "More").
 const links = [
-  { to: "/overview", label: "Overview", icon: LayoutDashboard },
-  { to: "/workflows", label: "Workflows", icon: Workflow },
-  { to: "/templates", label: "Templates", icon: LayoutGrid, permission: "workflows.edit" },
-  { to: "/integrations", label: "Integrations", icon: Plug, permission: "integrations.view" },
-  { to: "/executions", label: "Executions", icon: History },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/team", label: "Team", icon: Users, permission: "members.manage" },
-  { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/overview", label: "Overview", icon: LayoutDashboard, phone: true },
+  { to: "/workflows", label: "Workflows", icon: Workflow, phone: true },
+  { to: "/templates", label: "Templates", icon: LayoutGrid, permission: "workflows.edit", phone: false },
+  { to: "/integrations", label: "Integrations", icon: Plug, permission: "integrations.view", phone: false },
+  { to: "/executions", label: "Executions", icon: History, phone: true },
+  { to: "/analytics", label: "Analytics", icon: BarChart3, phone: true },
+  { to: "/team", label: "Team", icon: Users, permission: "members.manage", phone: false },
+  { to: "/settings", label: "Settings", icon: Settings, phone: false },
 ];
+
+// Activity has no sidebar link on a computer, but on a phone it is one tap away in More.
+const MORE_ONLY = [{ to: "/activity", label: "Activity", icon: ListChecks, permission: "runs.view" }];
 
 export function BrandMark() {
   return (
@@ -55,6 +62,8 @@ export function Shell({ children }: { children: ReactNode }) {
   const { session, can } = useAuth();
   const { pathname } = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(readCollapsed);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const closeMore = useCallback(() => setIsMoreOpen(false), []);
 
   function toggleSidebar() {
     saveCollapsed(!isCollapsed);
@@ -73,6 +82,11 @@ export function Shell({ children }: { children: ReactNode }) {
     window.location.assign("/sign-in");
   }
 
+  const allowed = links.filter((link) => !link.permission || can(link.permission));
+  const morePages = [...allowed.filter((link) => !link.phone), ...MORE_ONLY.filter((link) => can(link.permission))];
+  // The More tab lights up when the page shown is one of the pages inside it.
+  const isOnMorePage = morePages.some((link) => pathname.startsWith(link.to)) || pathname.startsWith("/docs");
+
   return (
     <div className="app">
       <nav className={`side ${isCollapsed ? "is-col" : ""}`} aria-label="Main">
@@ -80,13 +94,17 @@ export function Shell({ children }: { children: ReactNode }) {
           <BrandMark />
           <span className="side-word">FlowBridge</span>
         </NavLink>
-        {links.filter((link) => !link.permission || can(link.permission)).map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to} className={({ isActive }) => `nav tip ${isActive ? "is-on" : ""}`} data-tip={label} aria-label={label}>
+        {allowed.map(({ to, label, icon: Icon, phone }) => (
+          <NavLink key={to} to={to} className={({ isActive }) => `nav tip ${isActive ? "is-on" : ""} ${phone ? "" : "m-hide"}`} data-tip={label} aria-label={label}>
             <Icon size={17} aria-hidden="true" />
             <span className="nav-label">{label}</span>
             {to === "/executions" && needsAttention > 0 && <span className="nav-count">{needsAttention}</span>}
           </NavLink>
         ))}
+        <button className={`nav m-only ${isOnMorePage || isMoreOpen ? "is-on" : ""}`} aria-label="More pages" aria-expanded={isMoreOpen} onClick={() => setIsMoreOpen(true)}>
+          <Menu size={17} aria-hidden="true" />
+          <span className="nav-label">More</span>
+        </button>
         <div className="side-gap" />
         <NavLink className="nav tip m-hide" to="/docs" data-tip="Help and support" aria-label="Help and support">
           <BookOpen size={17} aria-hidden="true" />
@@ -133,6 +151,8 @@ export function Shell({ children }: { children: ReactNode }) {
         )}
         {children}
       </div>
+
+      {isMoreOpen && <MoreSheet links={morePages} onClose={closeMore} onSignOut={signOut} />}
     </div>
   );
 }
